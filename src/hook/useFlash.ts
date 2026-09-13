@@ -11,7 +11,6 @@ export function useFlash(value: number, duration = 700): string {
   const [cls, setCls] = useState("");
 
   useEffect(() => {
-    // No change (or NaN) -> do nothing
     if (value === prev.current || Number.isNaN(value)) return;
 
     const up = value > prev.current;
@@ -25,5 +24,4 @@ export function useFlash(value: number, duration = 700): string {
   return cls;
 }
 
-// Optional: also provide a default export so BOTH import styles work.
 export default useFlash;
