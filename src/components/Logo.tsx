@@ -9,14 +9,15 @@ export default function Logo({ onClick }: LogoProps) {
     <a
       href="#top"
       onClick={onClick}
-      className="group flex items-center gap-3 rounded-xl"
-      aria-label="TecnoIndicator — back to top"
+      className="group inline-flex items-center gap-2.5"
+      aria-label="TecnoIndicator home"
     >
-      <span className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-teal-400/30 bg-panel shadow-[0_0_20px_rgba(45,212,191,0.15)] transition-all duration-300 group-hover:border-teal-400/60 group-hover:shadow-[0_0_28px_rgba(45,212,191,0.3)]">
-        <Activity className="h-[18px] w-[18px] text-teal-300" strokeWidth={2.5} aria-hidden="true" />
+      <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-teal-400/30 bg-teal-400/10 text-teal-300 shadow-[0_0_24px_rgba(45,212,191,0.18)] transition-transform duration-300 group-hover:scale-105">
+        <Activity className="h-4.5 w-4.5" strokeWidth={2.4} />
       </span>
-      <span className="font-display text-lg font-bold tracking-tight text-white">
-        Tecno<span className="text-teal-300">Indicator</span>
+      <span className="font-display text-[15px] font-semibold tracking-tight text-slate-100">
+        Tecno
+        <span className="text-teal-300">Indicator</span>
       </span>
     </a>
   );

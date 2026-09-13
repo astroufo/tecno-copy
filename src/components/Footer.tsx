@@ -1,4 +1,4 @@
-import { FileImage, FileText, Waves } from "lucide-react";
+import { FileImage, FileText, Globe2, Waves } from "lucide-react";
 import Logo from "./Logo";
 import { GithubIcon } from "./icons";
 import { fmtFullDate, fmtTime } from "../lib/model";
@@ -6,11 +6,12 @@ import { EVENTS, emit } from "../lib/events";
 
 const NAV = [
   { href: "#forecast", label: "Forecast" },
+  { href: "#regions", label: "Regions" },
   { href: "#factors", label: "Factors" },
   { href: "#about", label: "About" },
 ];
 
-const REPO_URL = "https://github.com/xfst14/TecnoIndicator";
+const REPO_URL = "https://github.com/johndesantis/tecnoindicator";
 
 interface FooterProps {
   lastUpdated: Date;
@@ -24,7 +25,8 @@ export default function Footer({ lastUpdated }: FooterProps) {
           <div>
             <Logo />
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-slate-500">
-              Real-time 10-year forecasts for global oil, electricity &amp; water prices — computed
+              Real-time 10-year forecasts for global oil, electricity &amp; water prices — with
+              five-region evaluation across Americas, Europe, Asia, Africa and Oceania. Computed
               entirely in your browser from publicly known drivers.
             </p>
             <a
@@ -81,6 +83,14 @@ export default function Footer({ lastUpdated }: FooterProps) {
               </li>
               <li>
                 <a
+                  href="#regions"
+                  className="flex items-center gap-2 text-sm text-slate-400 transition-colors hover:text-teal-200"
+                >
+                  <Globe2 className="h-4 w-4" /> Regional evaluation
+                </a>
+              </li>
+              <li>
+                <a
                   href="#forecast"
                   className="flex items-center gap-2 text-sm text-slate-400 transition-colors hover:text-teal-200"
                 >
@@ -93,7 +103,8 @@ export default function Footer({ lastUpdated }: FooterProps) {
 
         <div className="mt-12 flex flex-col items-start justify-between gap-3 border-t border-line pt-6 sm:flex-row sm:items-center">
           <p className="text-xs text-slate-600">
-            © {new Date().getFullYear()} TecnoIndicator · Illustrative forecasts — not financial advice.
+            © {new Date().getFullYear()} TecnoIndicator · Illustrative forecasts — not financial
+            advice.
           </p>
           <p className="text-xs text-slate-600">
             Last updated: {fmtFullDate(lastUpdated)} · {fmtTime(lastUpdated)} · Model uses publicly

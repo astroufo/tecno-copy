@@ -1,15 +1,17 @@
-import { AlertTriangle, BarChart3, FunctionSquare, ShieldAlert, Workflow } from "lucide-react";
+import { AlertTriangle, BarChart3, FunctionSquare, Globe2, ShieldAlert, Workflow } from "lucide-react";
 import Reveal from "./Reveal";
 
 const SOURCES = [
   "EIA Short-Term Energy Outlook",
   "IEA World Energy Outlook",
   "OPEC Market Reports",
-  "GlobalPetrolPrices",
+  "GlobalPetrolPrices (Q1 2026)",
   "IRENA",
   "UN-Water",
   "FAO AQUASTAT",
   "World Bank",
+  "WRI Aqueduct",
+  "ICE Brent / NYMEX WTI / Dubai-Oman",
 ];
 
 const METHODS = [
@@ -17,13 +19,13 @@ const METHODS = [
     icon: BarChart3,
     color: "#f5b840",
     title: "Base trend",
-    text: "Each series starts from a realistic market price — Brent around $105/bbl, global power near $166/MWh, and global water near $2.50/m³ — then compounds at a structural CAGR of 3.8–5.0% depending on the commodity.",
+    text: "Each series starts from a realistic market price — Brent around $105/bbl, global power near $166/MWh, and global water near $2.50/m³ — then compounds at a structural CAGR of 3.8–5.0% depending on the commodity. Regional modes remap to WTI, Dubai/Oman, WAF and local retail tariffs.",
   },
   {
     icon: Workflow,
     color: "#2dd4bf",
     title: "Volatility bands",
-    text: "Low and high scenarios widen with the square root of time, reflecting how forecast uncertainty genuinely grows. At a 10-year horizon the bands span roughly ±22–34% around the average path.",
+    text: "Low and high scenarios widen with the square root of time, reflecting how forecast uncertainty genuinely grows. At a 10-year horizon the bands span roughly ±22–34% around the average path, with Africa and Asia carrying higher regional vol adjustments.",
   },
   {
     icon: FunctionSquare,
@@ -31,78 +33,84 @@ const METHODS = [
     title: "Factor adjustments",
     text: "Twelve researched drivers — from OPEC+ policy to water scarcity — each contribute a small drift that ramps up over the horizon, so the model stays explainable rather than being a black box.",
   },
+  {
+    icon: Globe2,
+    color: "#a78bfa",
+    title: "Five-region evaluation",
+    text: "Americas, Europe, Asia, Africa and Oceania are scored live using research-backed oil markers and 2026 retail electricity/water benchmarks (Europe & Oceania power ~$0.26/kWh, Asia ~$0.09/kWh, Americas mid-range).",
+  },
 ];
 
 export default function AboutSection() {
   return (
-    <section id="about" className="relative scroll-mt-24 border-t border-line/60 py-20 sm:py-28">
-      <div
-        className="pointer-events-none absolute left-[-200px] bottom-10 h-[420px] w-[420px] glow-water blur-3xl opacity-35"
-        aria-hidden="true"
-      />
-      <div className="relative mx-auto max-w-7xl px-5 sm:px-8">
+    <section id="about" className="relative scroll-mt-20 border-t border-line py-16 sm:py-20">
+      <div className="mx-auto max-w-7xl px-5 sm:px-8">
         <Reveal>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-teal-300">
-            Transparency
-          </p>
-          <h2 className="mt-3 max-w-2xl font-display text-3xl font-bold tracking-tight text-white sm:text-5xl">
-            About the model
-          </h2>
-          <p className="mt-4 max-w-2xl text-sm leading-relaxed text-slate-400">
-            TecnoIndicator is a demonstration of modern front-end data visualization: every number is
-            computed in your browser from publicly known drivers, with no backend and no API keys.
-            The goal is an honest, explorable illustration of how forecasters think about uncertainty
-            — not a crystal ball.
-          </p>
-        </Reveal>
-
-        <div className="mt-12 grid gap-5 lg:grid-cols-3">
-          {METHODS.map((m, i) => (
-            <Reveal key={m.title} delay={i * 90}>
-              <article className="group h-full rounded-2xl border border-line bg-panel p-7 transition-all duration-300 hover:-translate-y-1 hover:border-line-strong">
-                <span
-                  className="flex h-11 w-11 items-center justify-center rounded-xl border"
-                  style={{
-                    backgroundColor: `${m.color}12`,
-                    borderColor: `${m.color}33`,
-                    color: m.color,
-                  }}
-                >
-                  <m.icon className="h-5 w-5" aria-hidden="true" />
-                </span>
-                <h3 className="mt-5 font-display text-lg font-semibold text-white">{m.title}</h3>
-                <p className="mt-2.5 text-sm leading-relaxed text-slate-400">{m.text}</p>
-              </article>
-            </Reveal>
-          ))}
-        </div>
-
-        <Reveal delay={120}>
-          <div className="mt-10 rounded-2xl border border-line bg-panel p-7 sm:p-8">
-            <h3 className="font-display text-base font-semibold text-white">
-              Public data & reasoning sources
-            </h3>
-            <p className="mt-1.5 text-xs text-slate-500">
-              Base prices, growth rates and driver narratives are grounded in publicly available
-              research.
+          <div className="max-w-2xl">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-teal-300/80">
+              Transparency
             </p>
-            <ul className="mt-5 flex flex-wrap gap-2.5" aria-label="Data sources">
-              {SOURCES.map((s) => (
-                <li
-                  key={s}
-                  className="rounded-full border border-line bg-white/[0.025] px-3.5 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:border-teal-400/30 hover:text-teal-200"
-                >
-                  {s}
-                </li>
-              ))}
-            </ul>
+            <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              About the model
+            </h2>
+            <p className="mt-3 text-sm leading-relaxed text-slate-400">
+              TecnoIndicator is a demonstration of modern front-end data visualization: every number
+              is computed in your browser from publicly known drivers, with no backend and no API
+              keys. The goal is an honest, explorable illustration of how forecasters think about
+              uncertainty — not a crystal ball.
+            </p>
           </div>
         </Reveal>
 
-        <Reveal delay={150}>
-          <div className="mt-8 flex items-start gap-3.5 rounded-2xl border border-amber-400/20 bg-amber-400/[0.05] px-5 py-4 sm:px-6">
-            <ShieldAlert className="mt-0.5 h-[18px] w-[18px] shrink-0 text-amber-400" aria-hidden="true" />
-            <p className="text-sm leading-relaxed text-amber-200/80">
+        <div className="mt-10 grid gap-4 md:grid-cols-2">
+          {METHODS.map((m, i) => {
+            const Icon = m.icon;
+            return (
+              <Reveal key={m.title} delay={i * 70}>
+                <div className="h-full rounded-2xl border border-line bg-panel/60 p-5 sm:p-6">
+                  <span
+                    className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/5"
+                    style={{ background: `${m.color}18`, color: m.color }}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <h3 className="mt-4 font-display text-lg font-semibold text-white">{m.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-400">{m.text}</p>
+                </div>
+              </Reveal>
+            );
+          })}
+        </div>
+
+        <Reveal delay={200}>
+          <div className="mt-8 rounded-2xl border border-line bg-panel/50 p-5 sm:p-6">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="h-4 w-4 text-teal-300" />
+              <h3 className="font-display text-base font-semibold text-white">
+                Public data & reasoning sources
+              </h3>
+            </div>
+            <p className="mt-2 text-sm text-slate-400">
+              Base prices, growth rates, regional differentials and driver narratives are grounded
+              in publicly available research.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {SOURCES.map((s) => (
+                <span
+                  key={s}
+                  className="rounded-full border border-line bg-base/40 px-3 py-1.5 text-xs font-medium text-slate-400"
+                >
+                  {s}
+                </span>
+              ))}
+            </div>
+          </div>
+        </Reveal>
+
+        <Reveal delay={240}>
+          <div className="mt-6 flex gap-3 rounded-xl border border-amber-400/20 bg-amber-400/5 px-4 py-3.5 text-xs leading-relaxed text-amber-100/80">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+            <p>
               <span className="font-semibold text-amber-200">Important.</span> These are illustrative
               forecasts based on historical trends and publicly known drivers. Not financial advice.
               The live water quote is a simulated client-side feed within a realistic global price
@@ -111,18 +119,15 @@ export default function AboutSection() {
           </div>
         </Reveal>
 
-        <Reveal delay={180}>
-          <div className="mt-12 flex items-center gap-3 rounded-2xl border border-line bg-gradient-to-r from-teal-400/[0.06] to-transparent px-6 py-5">
-            <AlertTriangle className="hidden h-5 w-5 text-teal-300 sm:block" aria-hidden="true" />
-            <p className="text-sm text-slate-400">
-              Want to run your own scenarios? Press{" "}
-              <kbd className="rounded-md border border-line bg-white/[0.04] px-1.5 py-0.5 font-mono text-[11px] text-teal-200">
-                /
-              </kbd>{" "}
-              to jump to the horizon slider and watch the cards, chart and factor grid respond in real
-              time.
-            </p>
-          </div>
+        <Reveal delay={280}>
+          <p className="mt-8 text-center text-sm text-slate-500">
+            Want to run your own scenarios? Press{" "}
+            <kbd className="rounded border border-line bg-panel px-2 py-0.5 font-mono text-xs text-teal-300">
+              /
+            </kbd>{" "}
+            to jump to the horizon slider and watch the cards, chart, regions and factor grid respond
+            in real time.
+          </p>
         </Reveal>
       </div>
     </section>

@@ -36,14 +36,17 @@ import {
   buildCSV,
   COMMODITIES,
   downloadFile,
+  EVAL_REGIONS,
   fmtTime,
   fmtUsd,
   hexToRgba,
+  regionById,
   START_YEAR,
   type Commodity,
   type CommodityId,
   type ForecastPoint,
   type LiveWaterQuote,
+  type RegionId,
 } from "../lib/model";
 import { EVENTS } from "../lib/events";
 
@@ -81,7 +84,11 @@ type FancyDataset = ChartDataset<ChartKind, number[]> & {
   decimals?: number;
 };
 
-function buildDatasets(points: ForecastPoint[], type: ChartKind, bands: boolean): FancyDataset[] {
+function buildDatasets(
+  points: ForecastPoint[],
+  type: ChartKind,
+  bands: boolean,
+): FancyDataset[] {
   const datasets: FancyDataset[] = [];
   for (const c of COMMODITIES) {
     datasets.push({
@@ -103,7 +110,12 @@ function buildDatasets(points: ForecastPoint[], type: ChartKind, bands: boolean)
             tension: 0.35,
             fill: false,
           }
-        : { type: "bar" as const, borderRadius: 5, borderWidth: 0, maxBarThickness: 26 }),
+        : {
+            type: "bar" as const,
+            borderRadius: 5,
+            borderWidth: 0,
+            maxBarThickness: 26,
+          }),
     });
 
     if (type === "line" && bands) {
@@ -215,7 +227,10 @@ function buildConfig(
         x: {
           grid: { color: "rgba(148,163,184,0.06)" },
           border: { color: "#1b2740" },
-          ticks: { color: "rgba(219,228,240,0.6)", font: { family: "Inter", size: 11 } },
+          ticks: {
+            color: "rgba(219,228,240,0.6)",
+            font: { family: "Inter", size: 11 },
+          },
         },
         yOil: axisOpts("oil", "Oil $/bbl", "#f5b840"),
         yElec: axisOpts("electricity", "Power $/MWh", "#2dd4bf"),
@@ -234,9 +249,18 @@ interface CommodityCardProps {
   live: LiveWaterQuote | null;
   fetching: boolean;
   onFetchWater: () => void;
+  regionLabel: string;
 }
 
-function CommodityCard({ commodity, today, horizonBand, live, fetching, onFetchWater }: CommodityCardProps) {
+function CommodityCard({
+  commodity,
+  today,
+  horizonBand,
+  live,
+  fetching,
+  onFetchWater,
+  regionLabel,
+}: CommodityCardProps) {
   const Icon = ICONS[commodity.id];
   const band = horizonBand[commodity.id];
   const todayBand = today[commodity.id];
@@ -248,106 +272,101 @@ function CommodityCard({ commodity, today, horizonBand, live, fetching, onFetchW
   const spotFlash = useFlash(todayBand.avg);
 
   return (
-    <article className="group relative flex h-full flex-col rounded-2xl border border-line bg-panel p-6 transition-all duration-300 hover:-translate-y-1 hover:border-line-strong hover:shadow-[0_20px_60px_rgba(0,0,0,0.45)]">
+    <div className="group relative overflow-hidden rounded-2xl border border-line bg-panel/70 p-5 transition-all duration-300 hover:border-line-strong hover:bg-panel">
       <div
-        className="pointer-events-none absolute inset-x-6 top-0 h-px"
-        style={{ background: `linear-gradient(90deg, transparent, ${commodity.color}66, transparent)` }}
-        aria-hidden="true"
+        className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full opacity-30 blur-2xl transition-opacity group-hover:opacity-50"
+        style={{ background: commodity.color }}
       />
-      <div className="flex items-start justify-between gap-3">
+      <div className="relative flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <span
-            className="flex h-11 w-11 items-center justify-center rounded-xl border"
-            style={{
-              backgroundColor: `${commodity.color}12`,
-              borderColor: `${commodity.color}33`,
-              color: commodity.color,
-            }}
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/5"
+            style={{ background: `${commodity.color}18`, color: commodity.color }}
           >
-            <Icon className="h-5 w-5" aria-hidden="true" />
+            <Icon className="h-5 w-5" />
           </span>
           <div>
-            <h3 className="font-display text-base font-semibold text-white">{commodity.name}</h3>
-            <p className="text-[11px] uppercase tracking-[0.14em] text-slate-500">{commodity.unit}</p>
+            <p className="text-sm font-semibold text-slate-100">{commodity.name}</p>
+            <p className="text-[11px] text-slate-500">
+              {commodity.unit} · {regionLabel}
+            </p>
           </div>
         </div>
         {isWater && live && (
-          <span className="flex items-center gap-1.5 rounded-full border border-teal-400/25 bg-teal-400/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-teal-300">
-            <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-teal-300" aria-hidden="true" />
+          <span className="rounded-full border border-sky-400/30 bg-sky-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-sky-300">
             Live
           </span>
         )}
       </div>
 
-      <p
-        className={`mt-6 font-display text-[2.6rem] font-bold leading-none tabular-nums text-white ${flashCls}`}
-      >
+      <p className={`relative mt-5 font-display text-3xl font-bold tabular-nums text-white ${flashCls}`}>
         {fmtUsd(band.avg, commodity.decimals)}
       </p>
-      <p className="mt-2 flex items-center gap-2 text-xs text-slate-500">
-        <span>Average forecast · {horizonBand.year}</span>
-        <span className="text-slate-600">·</span>
-        <span className={`tabular-nums ${spotFlash}`}>
-          spot {fmtUsd(todayBand.avg, commodity.decimals)}
+      <p className="mt-1 text-xs text-slate-500">
+        Average forecast · {horizonBand.year} · spot{" "}
+        <span className={`font-semibold text-slate-300 ${spotFlash}`}>
+          {fmtUsd(todayBand.avg, commodity.decimals)}
         </span>
       </p>
 
-      <div className="mt-5 grid grid-cols-2 gap-3">
-        <div className="rounded-xl border border-line bg-white/[0.02] px-3.5 py-3">
-          <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-400">
-            <ArrowDownRight className="h-3.5 w-3.5" aria-hidden="true" /> Low
-          </p>
-          <p className="mt-1 font-display text-lg font-bold tabular-nums text-slate-100">
+      <div className="relative mt-4 grid grid-cols-2 gap-2">
+        <div className="rounded-xl border border-line bg-base/40 px-3 py-2.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Low</p>
+          <p className="mt-0.5 font-display text-sm font-semibold text-slate-200">
             {fmtUsd(band.min, commodity.decimals)}
           </p>
         </div>
-        <div className="rounded-xl border border-line bg-white/[0.02] px-3.5 py-3">
-          <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-rose-400">
-            <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" /> High
-          </p>
-          <p className="mt-1 font-display text-lg font-bold tabular-nums text-slate-100">
+        <div className="rounded-xl border border-line bg-base/40 px-3 py-2.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">High</p>
+          <p className="mt-0.5 font-display text-sm font-semibold text-slate-200">
             {fmtUsd(band.max, commodity.decimals)}
           </p>
         </div>
       </div>
 
-      <div className="mt-5 flex items-center justify-between border-t border-line pt-4">
+      <div className="relative mt-4 flex items-center justify-between gap-2 text-xs">
         <span
-          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums ${
-            up ? "bg-rose-400/10 text-rose-300" : "bg-emerald-400/10 text-emerald-300"
+          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold ${
+            up
+              ? "bg-rose-400/10 text-rose-300"
+              : "bg-emerald-400/10 text-emerald-300"
           }`}
         >
           {up ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
           {up ? "+" : "−"}
           {Math.abs(deltaPct).toFixed(1)}% vs today
         </span>
-        <span className="text-[11px] text-slate-500">±{commodity.maxVol * 100}% vol @10y</span>
+        <span className="text-slate-600">±{(commodity.maxVol * 100).toFixed(0)}% vol @10y</span>
       </div>
 
       {isWater && (
-        <div className="mt-4">
+        <div className="relative mt-4 border-t border-line pt-4">
           <button
             type="button"
             onClick={onFetchWater}
             disabled={fetching}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-water/30 bg-water/10 px-4 py-2.5 text-sm font-semibold text-sky-200 transition-all duration-200 hover:border-water/60 hover:bg-water/15 disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-sky-400/30 bg-sky-400/10 px-3 py-2.5 text-xs font-semibold text-sky-200 transition-all hover:bg-sky-400/15 disabled:opacity-60"
           >
             {fetching ? (
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
-              <Waves className="h-4 w-4" aria-hidden="true" />
+              <Waves className="h-3.5 w-3.5" />
             )}
-            {fetching ? "Fetching live quote…" : live ? "Re-fetch Live Water Price" : "Fetch Live Water Price"}
+            {fetching
+              ? "Fetching live quote…"
+              : live
+                ? "Re-fetch Live Water Price"
+                : "Fetch Live Water Price"}
           </button>
           {live && (
-            <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
-              <span className="font-semibold text-sky-300">{fmtUsd(live.price, 2)}/m³</span> · {live.asOf} ·{" "}
-              {live.source} · {live.range}
+            <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+              <span className="font-semibold text-sky-300">{fmtUsd(live.price, 2)}/m³</span> ·{" "}
+              {live.asOf} · {live.source} · {live.range}
             </p>
           )}
         </div>
       )}
-    </article>
+    </div>
   );
 }
 
@@ -366,6 +385,8 @@ interface ForecastToolProps {
   isLive: boolean;
   streaming: boolean;
   onToggleLive: () => void;
+  region: RegionId;
+  onRegion: (r: RegionId) => void;
 }
 
 export default function ForecastTool({
@@ -381,6 +402,8 @@ export default function ForecastTool({
   isLive,
   streaming,
   onToggleLive,
+  region,
+  onRegion,
 }: ForecastToolProps) {
   const [chartType, setChartType] = useState<ChartKind>("line");
   const [showBands, setShowBands] = useState(true);
@@ -389,20 +412,20 @@ export default function ForecastTool({
   const [spin, setSpin] = useState(false);
   const [exportFlash, setExportFlash] = useState(false);
   const [announce, setAnnounce] = useState("");
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Chart.js generics are strict across mixed line/bar configs — keep loose.
   const chartRef = useRef<Chart | null>(null);
-  const sliderRef = useRef<HTMLInputElement | null>(null);
+  const sliderRef = useRef<HTMLInputElement>(null);
 
   const today = points[0];
   const horizonBand = points[points.length - 1];
+  const regionProfile = regionById(region);
 
-  /* ticking clock for the live feel */
   useEffect(() => {
     const id = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(id);
   }, []);
 
-  /* chart lifecycle — recreated when the chart type changes */
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -418,25 +441,25 @@ export default function ForecastTool({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chartType]);
 
-  /* data refresh — patch the existing chart */
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
     chart.data.labels = points.map((p) => p.label);
     chart.data.datasets = buildDatasets(points, chartType, showBands);
+    // Refresh axis ranges
+    const cfg = buildConfig(chartType, points, showBands);
+    if (chart.options.scales) {
+      chart.options.scales = cfg.options?.scales;
+    }
     chart.update();
   }, [points, chartType, showBands]);
 
-  /* Screen-reader announcements.
-     Deliberately keyed to the horizon (and not to every live tick) so the
-     streaming feed does not spam assistive technology every few seconds. */
   useEffect(() => {
     setAnnounce(
-      `Forecast updated for a ${horizon}-year horizon, ${START_YEAR} to ${START_YEAR + horizon}.`,
+      `Forecast updated for ${regionProfile.name}, ${horizon}-year horizon, ${START_YEAR} to ${START_YEAR + horizon}.`,
     );
-  }, [horizon]);
+  }, [horizon, regionProfile.name]);
 
-  /* export actions from the navbar */
   useEffect(() => {
     const onPng = () => {
       const chart = chartRef.current;
@@ -444,15 +467,15 @@ export default function ForecastTool({
       const url = chart.toBase64Image("image/png", 1);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `tecnoindicator-forecast-${horizon}y.png`;
+      a.download = `tecnoindicator-forecast-${region}-${horizon}y.png`;
       a.click();
       setExportFlash(true);
       window.setTimeout(() => setExportFlash(false), 1800);
     };
     const onCsv = () =>
       downloadFile(
-        `tecnoindicator-forecast-${horizon}y.csv`,
-        buildCSV(points),
+        `tecnoindicator-forecast-${region}-${horizon}y.csv`,
+        buildCSV(points, region),
         "text/csv;charset=utf-8",
       );
     window.addEventListener(EVENTS.EXPORT_PNG, onPng);
@@ -461,9 +484,8 @@ export default function ForecastTool({
       window.removeEventListener(EVENTS.EXPORT_PNG, onPng);
       window.removeEventListener(EVENTS.EXPORT_CSV, onCsv);
     };
-  }, [points, horizon]);
+  }, [points, horizon, region]);
 
-  /* keyboard shortcut: "/" focuses the horizon slider */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "/") return;
@@ -489,7 +511,7 @@ export default function ForecastTool({
     const url = chart.toBase64Image("image/png", 1);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `tecnoindicator-forecast-${horizon}y.png`;
+    a.download = `tecnoindicator-forecast-${region}-${horizon}y.png`;
     a.click();
     setExportFlash(true);
     window.setTimeout(() => setExportFlash(false), 1800);
@@ -497,94 +519,80 @@ export default function ForecastTool({
 
   const exportCsv = () =>
     downloadFile(
-      `tecnoindicator-forecast-${horizon}y.csv`,
-      buildCSV(points),
+      `tecnoindicator-forecast-${region}-${horizon}y.csv`,
+      buildCSV(points, region),
       "text/csv;charset=utf-8",
     );
 
   const fillPct = ((horizon - 1) / 9) * 100;
 
   return (
-    <section id="forecast" className="relative scroll-mt-24 py-20 sm:py-28">
-      <div
-        className="pointer-events-none absolute left-[-180px] top-24 h-[420px] w-[420px] glow-teal blur-3xl opacity-40"
-        aria-hidden="true"
-      />
-      <div className="relative mx-auto max-w-7xl px-5 sm:px-8">
+    <section id="forecast" className="relative scroll-mt-20 py-16 sm:py-20">
+      <div className="mx-auto max-w-7xl px-5 sm:px-8">
         {/* heading */}
         <Reveal>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-teal-300">
-            Forecast studio
-          </p>
-          <div className="mt-3 flex flex-wrap items-end justify-between gap-6">
-            <h2 className="max-w-2xl font-display text-3xl font-bold tracking-tight text-white sm:text-5xl">
-              Interactive price forecasts
-            </h2>
-            {/* live bar */}
-            <div className="flex flex-wrap items-center gap-2.5">
+          <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-teal-300/80">
+                Forecast studio
+              </p>
+              <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                Interactive price forecasts
+              </h2>
+            </div>
+          </div>
+        </Reveal>
+
+        {/* live bar */}
+        <Reveal delay={60}>
+          <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-line bg-panel/60 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-3.5">
+            <div className="flex flex-wrap items-center gap-3">
               <span
-                className={`flex items-center gap-2 rounded-full border px-3.5 py-2 text-xs transition-colors duration-300 ${
+                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${
                   streaming
-                    ? "border-teal-400/30 bg-teal-400/[0.07] text-slate-300"
+                    ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
                     : "border-line bg-white/[0.03] text-slate-400"
                 }`}
-                aria-live="off"
               >
-                <span className="relative flex h-2 w-2">
-                  {streaming && (
-                    <span className="ping-ring absolute inline-flex h-full w-full rounded-full bg-teal-400" aria-hidden="true" />
-                  )}
-                  <span
-                    className={`relative inline-flex h-2 w-2 rounded-full ${
-                      streaming ? "pulse-dot bg-teal-300" : "bg-slate-500"
-                    }`}
-                    aria-hidden="true"
-                  />
-                </span>
-                <span className={`font-semibold ${streaming ? "text-teal-200" : "text-slate-300"}`}>
-                  {streaming ? "Live" : "Paused"}
-                </span>
-                <span className="tabular-nums text-slate-500">{fmtTime(now)}</span>
-                <span className="hidden text-slate-600 sm:inline">
-                  · upd {fmtTime(lastUpdated)}
-                </span>
+                {streaming && (
+                  <span className="relative flex h-2 w-2">
+                    <span className="ping-ring absolute inline-flex h-full w-full rounded-full bg-emerald-400" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400 pulse-dot" />
+                  </span>
+                )}
+                {streaming ? "Live" : "Paused"}
               </span>
+              <span className="text-xs text-slate-500">
+                {fmtTime(now)} · upd {fmtTime(lastUpdated)}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={onToggleLive}
-                aria-pressed={isLive}
-                className="flex items-center gap-2 rounded-full border border-line bg-white/[0.03] px-4 py-2 text-xs font-semibold text-slate-200 transition-all duration-200 hover:border-teal-400/40 hover:text-teal-200"
-                aria-label={isLive ? "Pause the live market feed" : "Resume the live market feed"}
+                className="inline-flex items-center gap-2 rounded-lg border border-line bg-white/[0.03] px-3 py-2 text-xs font-semibold text-slate-200 transition-colors hover:border-line-strong"
               >
-                {isLive ? (
-                  <Pause className="h-3.5 w-3.5 text-teal-300" aria-hidden="true" />
-                ) : (
-                  <Play className="h-3.5 w-3.5 text-teal-300" aria-hidden="true" />
-                )}
+                {isLive ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
                 {isLive ? "Pause feed" : "Resume feed"}
               </button>
               <button
                 type="button"
                 onClick={handleRefresh}
-                className={`flex items-center gap-2 rounded-full border border-line bg-white/[0.03] px-4 py-2 text-xs font-semibold text-slate-200 transition-all duration-200 hover:border-teal-400/40 hover:text-teal-200 ${
-                  spin ? "spin-once" : ""
-                }`}
-                aria-label="Refresh data — randomly perturbs current prices within realistic ranges"
+                className="inline-flex items-center gap-2 rounded-lg border border-line bg-white/[0.03] px-3 py-2 text-xs font-semibold text-slate-200 transition-colors hover:border-line-strong"
               >
-                <RefreshCw className="h-3.5 w-3.5 text-teal-300" aria-hidden="true" />
+                <RefreshCw className={`h-3.5 w-3.5 ${spin ? "spin-once" : ""}`} />
                 Refresh data
               </button>
               <button
                 type="button"
                 onClick={onFetchWater}
                 disabled={waterFetching}
-                className="flex items-center gap-2 rounded-full border border-water/35 bg-water/10 px-4 py-2 text-xs font-semibold text-sky-200 transition-all duration-200 hover:border-water/60 hover:bg-water/15 disabled:opacity-60"
-                aria-label="Fetch live global water price from simulated market feed"
+                className="inline-flex items-center gap-2 rounded-lg border border-sky-400/30 bg-sky-400/10 px-3 py-2 text-xs font-semibold text-sky-200 transition-colors hover:bg-sky-400/15 disabled:opacity-60"
               >
                 {waterFetching ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
-                  <Waves className="h-3.5 w-3.5" aria-hidden="true" />
+                  <Waves className="h-3.5 w-3.5" />
                 )}
                 {waterFetching ? "Fetching…" : "Fetch live water price"}
               </button>
@@ -592,60 +600,90 @@ export default function ForecastTool({
           </div>
         </Reveal>
 
-        {/* horizon control */}
-        <Reveal delay={80}>
-          <div className="mt-10 rounded-2xl border border-line bg-panel p-6 sm:p-7">
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-                  Forecast horizon
-                </p>
-                <p className="mt-1.5 font-display text-xl font-bold text-white">
-                  <span className="text-teal-300 tabular-nums">{horizon}</span>{" "}
-                  {horizon === 1 ? "year" : "years"}
-                  <span className="ml-2 text-sm font-medium text-slate-500">
-                    · {START_YEAR} → {START_YEAR + horizon}
-                  </span>
-                </p>
+        {/* region + horizon controls */}
+        <Reveal delay={90}>
+          <div className="mb-6 rounded-2xl border border-line bg-panel/60 p-5 sm:p-6">
+            <div className="mb-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-slate-200">Evaluation region</p>
+                <p className="text-xs text-slate-500">{regionProfile.blurb}</p>
               </div>
-              <p className="hidden text-xs text-slate-500 sm:block">
-                Press <kbd className="rounded-md border border-line bg-white/[0.04] px-1.5 py-0.5 font-mono text-[11px] text-slate-300">/</kbd> to
-                focus the slider
-              </p>
-            </div>
-
-            <div className="mt-6">
-              <input
-                ref={sliderRef}
-                type="range"
-                min={1}
-                max={10}
-                step={1}
-                value={horizon}
-                onChange={(e) => onHorizon(Number(e.target.value))}
-                className="slider"
-                style={{ ["--fill" as string]: `${fillPct}%` }}
-                aria-label="Forecast horizon in years"
-                aria-valuetext={`${horizon} years, ${START_YEAR} to ${START_YEAR + horizon}`}
-              />
-              <div className="mt-2 flex justify-between text-[10px] font-semibold tabular-nums text-slate-600">
-                {Array.from({ length: 10 }, (_, i) => i + 1).map((y) => (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => onRegion("global")}
+                  aria-pressed={region === "global"}
+                  className={`rounded-xl border px-3.5 py-2 text-xs font-semibold transition-all ${
+                    region === "global"
+                      ? "border-teal-400/50 bg-teal-400/15 text-teal-200"
+                      : "border-line bg-white/[0.02] text-slate-400 hover:border-line-strong hover:text-slate-200"
+                  }`}
+                >
+                  🌐 Global
+                </button>
+                {EVAL_REGIONS.map((r) => (
                   <button
-                    key={y}
+                    key={r.id}
                     type="button"
-                    onClick={() => onHorizon(y)}
-                    aria-label={`Set horizon to ${y} years`}
-                    className={`transition-colors ${
-                      y === horizon ? "text-teal-300" : "hover:text-slate-300"
+                    onClick={() => onRegion(r.id)}
+                    aria-pressed={region === r.id}
+                    className={`rounded-xl border px-3.5 py-2 text-xs font-semibold transition-all ${
+                      region === r.id
+                        ? "border-teal-400/50 bg-teal-400/15 text-teal-200"
+                        : "border-line bg-white/[0.02] text-slate-400 hover:border-line-strong hover:text-slate-200"
                     }`}
                   >
-                    {y}
+                    {r.flag} {r.short}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="mt-5 flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-200">Forecast horizon</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  <span className="font-display text-2xl font-bold text-teal-300">{horizon}</span>{" "}
+                  {horizon === 1 ? "year" : "years"} · {START_YEAR} → {START_YEAR + horizon}
+                </p>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                Press <kbd className="rounded border border-line bg-base px-1.5 py-0.5 font-mono text-slate-400">/</kbd>{" "}
+                to focus the slider
+              </p>
+            </div>
+
+            <input
+              ref={sliderRef}
+              type="range"
+              min={1}
+              max={10}
+              step={1}
+              value={horizon}
+              onChange={(e) => onHorizon(Number(e.target.value))}
+              className="slider mt-4"
+              style={{ ["--fill" as string]: `${fillPct}%` }}
+              aria-label="Forecast horizon in years"
+              aria-valuetext={`${horizon} years, ${START_YEAR} to ${START_YEAR + horizon}`}
+            />
+
+            <div className="mt-2 flex justify-between px-0.5 text-[10px] font-medium text-slate-600">
+              {Array.from({ length: 10 }, (_, i) => i + 1).map((y) => (
+                <button
+                  key={y}
+                  type="button"
+                  onClick={() => onHorizon(y)}
+                  aria-label={`Set horizon to ${y} years`}
+                  className={`transition-colors ${
+                    y === horizon ? "text-teal-300" : "hover:text-slate-300"
+                  }`}
+                >
+                  {y}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
               {QUICK_HORIZONS.map((y) => (
                 <button
                   key={y}
@@ -666,28 +704,41 @@ export default function ForecastTool({
         </Reveal>
 
         {/* commodity cards */}
-        <div className="mt-8 grid gap-5 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-3">
           {COMMODITIES.map((c, i) => (
-            <Reveal key={c.id} delay={110 + i * 80} className="h-full">
+            <Reveal key={c.id} delay={100 + i * 60}>
               <CommodityCard
-                commodity={c}
+                commodity={{
+                  ...c,
+                  name:
+                    region === "global"
+                      ? c.name
+                      : c.id === "oil"
+                        ? `${regionProfile.oilMarker} Oil`
+                        : `${regionProfile.short} ${c.short}`,
+                }}
                 today={today}
                 horizonBand={horizonBand}
-                live={c.id === "water" ? waterLive : null}
-                fetching={c.id === "water" && waterFetching}
+                live={waterLive}
+                fetching={waterFetching}
                 onFetchWater={onFetchWater}
+                regionLabel={regionProfile.short}
               />
             </Reveal>
           ))}
         </div>
 
         {/* chart */}
-        <Reveal delay={120}>
-          <div className="mt-10 overflow-hidden rounded-2xl border border-line bg-panel">
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line px-6 py-5 sm:px-7">
+        <Reveal delay={160}>
+          <div
+            className={`mt-6 rounded-2xl border border-line bg-panel/60 p-5 sm:p-6 ${exportFlash ? "export-pulse" : ""}`}
+          >
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h3 className="font-display text-lg font-semibold text-white">Price trajectories</h3>
-                <p className="mt-0.5 text-xs text-slate-500">
+                <h3 className="font-display text-lg font-semibold text-white">
+                  Price trajectories · {regionProfile.flag} {regionProfile.name}
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">
                   {chartType === "line" && showBands
                     ? "Solid lines = average · dashed = low/high scenario bands"
                     : chartType === "line"
@@ -695,9 +746,8 @@ export default function ForecastTool({
                       : "Average price per year per commodity"}
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-2.5">
-                {/* chart type toggle */}
-                <div className="flex rounded-lg border border-line bg-white/[0.03] p-0.5" role="group" aria-label="Chart type">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex rounded-lg border border-line bg-base/50 p-0.5">
                   {(["line", "bar"] as const).map((t) => (
                     <button
                       key={t}
@@ -714,120 +764,134 @@ export default function ForecastTool({
                     </button>
                   ))}
                 </div>
-                {/* bands toggle */}
                 <button
                   type="button"
-                  role="switch"
-                  aria-checked={showBands}
                   onClick={() => setShowBands((v) => !v)}
                   disabled={chartType === "bar"}
                   className="flex items-center gap-2 rounded-lg border border-line bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:border-line-strong disabled:opacity-40"
                 >
                   <span
-                    className={`relative h-4 w-7 rounded-full transition-colors duration-200 ${
-                      showBands ? "bg-teal-400/80" : "bg-slate-600"
-                    }`}
-                  >
-                    <span
-                      className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all duration-200 ${
-                        showBands ? "left-3.5" : "left-0.5"
-                      }`}
-                      aria-hidden="true"
-                    />
-                  </span>
+                    className={`h-2 w-2 rounded-full ${showBands ? "bg-teal-400" : "bg-slate-600"}`}
+                  />
                   Bands
                 </button>
                 <button
                   type="button"
                   onClick={exportPng}
-                  className={`flex items-center gap-2 rounded-lg border border-line bg-white/[0.03] px-3.5 py-2 text-xs font-semibold text-slate-200 transition-all duration-200 hover:border-oil/50 hover:text-oil ${
-                    exportFlash ? "export-pulse" : ""
-                  }`}
-                  aria-label="Download chart as PNG"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:border-oil/40 hover:text-oil"
                 >
-                  <ImageIcon className="h-3.5 w-3.5 text-oil" aria-hidden="true" />
+                  <ImageIcon className="h-3.5 w-3.5" />
                   PNG
                 </button>
               </div>
             </div>
-            <div className="h-[380px] p-5 sm:h-[440px] sm:p-7">
-              <canvas
-                ref={canvasRef}
-                role="img"
-                aria-label={`Line chart of yearly average, minimum and maximum price forecasts for oil, electricity and water from ${START_YEAR} to ${START_YEAR + horizon}`}
-              />
+            <div className="h-[340px] w-full sm:h-[400px]">
+              <canvas ref={canvasRef} aria-label="Commodity price forecast chart" />
             </div>
           </div>
         </Reveal>
 
         {/* table */}
-        <Reveal delay={100}>
-          <div className="mt-8 overflow-hidden rounded-2xl border border-line bg-panel">
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line px-6 py-5 sm:px-7">
+        <Reveal delay={200}>
+          <div className="mt-6 overflow-hidden rounded-2xl border border-line bg-panel/60">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4 sm:px-6">
               <div>
                 <h3 className="font-display text-lg font-semibold text-white">Forecast table</h3>
-                <p className="mt-0.5 text-xs text-slate-500">Yearly average / low / high scenarios in USD</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Yearly average / low / high scenarios in USD · {regionProfile.name}
+                </p>
               </div>
               <button
                 type="button"
                 onClick={exportCsv}
-                className="flex items-center gap-2 rounded-lg border border-line bg-white/[0.03] px-3.5 py-2 text-xs font-semibold text-slate-200 transition-all duration-200 hover:border-water/50 hover:text-water"
-                aria-label="Download forecast table as CSV"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:border-water/40 hover:text-water"
               >
-                <FileText className="h-3.5 w-3.5 text-water" aria-hidden="true" />
+                <FileText className="h-3.5 w-3.5" />
                 CSV
               </button>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[820px] text-sm">
+              <table className="w-full min-w-[720px] text-left text-sm">
                 <thead>
-                  <tr className="border-b border-line bg-white/[0.025] text-left">
-                    <th rowSpan={2} className="px-5 py-3.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 sm:px-7">
+                  <tr className="border-b border-line bg-base/40 text-[11px] uppercase tracking-wider text-slate-500">
+                    <th className="px-5 py-3 font-semibold sm:px-6" rowSpan={2}>
                       Year
                     </th>
-                    <th colSpan={3} className="border-l border-line px-3 py-2 text-center text-xs font-bold uppercase tracking-[0.14em] text-oil">
-                      Oil <span className="font-normal text-slate-500">USD/bbl</span>
+                    <th
+                      className="px-3 py-2 text-center font-semibold"
+                      colSpan={3}
+                      style={{ color: "#f5b840" }}
+                    >
+                      Oil USD/bbl
                     </th>
-                    <th colSpan={3} className="border-l border-line px-3 py-2 text-center text-xs font-bold uppercase tracking-[0.14em] text-elec">
-                      Electricity <span className="font-normal text-slate-500">USD/MWh</span>
+                    <th
+                      className="px-3 py-2 text-center font-semibold"
+                      colSpan={3}
+                      style={{ color: "#2dd4bf" }}
+                    >
+                      Electricity USD/MWh
                     </th>
-                    <th colSpan={3} className="border-l border-line px-3 py-2 text-center text-xs font-bold uppercase tracking-[0.14em] text-water">
-                      Water <span className="font-normal text-slate-500">USD/m³</span>
+                    <th
+                      className="px-3 py-2 text-center font-semibold"
+                      colSpan={3}
+                      style={{ color: "#38bdf8" }}
+                    >
+                      Water USD/m³
                     </th>
                   </tr>
-                  <tr className="border-b border-line text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                    {["Avg", "Low", "High", "Avg", "Low", "High", "Avg", "Low", "High"].map((h, i) => (
-                      <th key={`${h}-${i}`} className="border-l border-line/60 px-3 py-2 text-center">
-                        {h}
-                      </th>
-                    ))}
+                  <tr className="border-b border-line bg-base/20 text-[10px] uppercase tracking-wider text-slate-600">
+                    {["Avg", "Low", "High", "Avg", "Low", "High", "Avg", "Low", "High"].map(
+                      (h, i) => (
+                        <th key={`${h}-${i}`} className="px-3 py-2 text-center font-medium">
+                          {h}
+                        </th>
+                      ),
+                    )}
                   </tr>
                 </thead>
                 <tbody>
                   {points.map((p, idx) => (
                     <tr
                       key={p.year}
-                      className={`border-b border-line/50 transition-colors last:border-0 hover:bg-white/[0.03] ${
+                      className={`border-b border-line/60 transition-colors hover:bg-white/[0.02] ${
                         idx === 0 ? "bg-teal-400/[0.04]" : ""
                       }`}
                     >
-                      <td className="px-5 py-3 font-display font-semibold text-white sm:px-7">
+                      <td className="px-5 py-3 font-display font-semibold text-slate-100 sm:px-6">
                         {p.year}
                         {idx === 0 && (
-                          <span className="ml-2 rounded-full border border-teal-400/30 bg-teal-400/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-teal-300">
+                          <span className="ml-2 rounded-full border border-teal-400/30 bg-teal-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-teal-300">
                             Today
                           </span>
                         )}
                       </td>
-                      <td className="border-l border-line/60 px-3 py-3 text-right font-semibold tabular-nums text-slate-100">{fmtUsd(p.oil.avg, 1)}</td>
-                      <td className="px-3 py-3 text-right tabular-nums text-emerald-400/90">{fmtUsd(p.oil.min, 1)}</td>
-                      <td className="px-3 py-3 text-right tabular-nums text-rose-400/90">{fmtUsd(p.oil.max, 1)}</td>
-                      <td className="border-l border-line/60 px-3 py-3 text-right font-semibold tabular-nums text-slate-100">{fmtUsd(p.electricity.avg, 0)}</td>
-                      <td className="px-3 py-3 text-right tabular-nums text-emerald-400/90">{fmtUsd(p.electricity.min, 0)}</td>
-                      <td className="px-3 py-3 text-right tabular-nums text-rose-400/90">{fmtUsd(p.electricity.max, 0)}</td>
-                      <td className="border-l border-line/60 px-3 py-3 text-right font-semibold tabular-nums text-slate-100">{fmtUsd(p.water.avg, 2)}</td>
-                      <td className="px-3 py-3 text-right tabular-nums text-emerald-400/90">{fmtUsd(p.water.min, 2)}</td>
-                      <td className="px-3 py-3 text-right tabular-nums text-rose-400/90">{fmtUsd(p.water.max, 2)}</td>
+                      <td className="px-3 py-3 text-center tabular-nums text-slate-200">
+                        {fmtUsd(p.oil.avg, 1)}
+                      </td>
+                      <td className="px-3 py-3 text-center tabular-nums text-slate-500">
+                        {fmtUsd(p.oil.min, 1)}
+                      </td>
+                      <td className="px-3 py-3 text-center tabular-nums text-slate-500">
+                        {fmtUsd(p.oil.max, 1)}
+                      </td>
+                      <td className="px-3 py-3 text-center tabular-nums text-slate-200">
+                        {fmtUsd(p.electricity.avg, 0)}
+                      </td>
+                      <td className="px-3 py-3 text-center tabular-nums text-slate-500">
+                        {fmtUsd(p.electricity.min, 0)}
+                      </td>
+                      <td className="px-3 py-3 text-center tabular-nums text-slate-500">
+                        {fmtUsd(p.electricity.max, 0)}
+                      </td>
+                      <td className="px-3 py-3 text-center tabular-nums text-slate-200">
+                        {fmtUsd(p.water.avg, 2)}
+                      </td>
+                      <td className="px-3 py-3 text-center tabular-nums text-slate-500">
+                        {fmtUsd(p.water.min, 2)}
+                      </td>
+                      <td className="px-3 py-3 text-center tabular-nums text-slate-500">
+                        {fmtUsd(p.water.max, 2)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -837,8 +901,8 @@ export default function ForecastTool({
         </Reveal>
 
         {/* assumptions */}
-        <Reveal delay={80}>
-          <div className="mt-8 overflow-hidden rounded-2xl border border-line bg-panel">
+        <Reveal delay={220}>
+          <div className="mt-6 overflow-hidden rounded-2xl border border-line bg-panel/50">
             <button
               type="button"
               onClick={() => setAssumptionsOpen((v) => !v)}
@@ -846,117 +910,109 @@ export default function ForecastTool({
               className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left transition-colors hover:bg-white/[0.02] sm:px-7"
             >
               <span className="flex items-center gap-3">
-                <Info className="h-4.5 w-4.5 h-[18px] w-[18px] text-teal-300" aria-hidden="true" />
-                <span className="font-display text-base font-semibold text-white">Show underlying assumptions</span>
+                <Info className="h-4 w-4 text-teal-300" />
+                <span className="text-sm font-semibold text-slate-200">
+                  Show underlying assumptions
+                </span>
               </span>
               <ChevronRight
-                className={`h-4 w-4 text-slate-400 transition-transform duration-300 ${assumptionsOpen ? "rotate-90" : ""}`}
-                aria-hidden="true"
+                className={`h-4 w-4 text-slate-500 transition-transform ${assumptionsOpen ? "rotate-90" : ""}`}
               />
             </button>
-            <div
-              className={`grid transition-all duration-500 ease-out ${
-                assumptionsOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
-              }`}
-            >
-              <div className="overflow-hidden">
-                <div className="border-t border-line px-6 py-6 sm:px-7">
-                  <p className="text-sm leading-relaxed text-slate-400">
-                    Every forecast is generated entirely in your browser using a transparent three-part
-                    model — a compounding base trend, horizon-scaled volatility bands, and small drift
-                    adjustments from the key drivers listed in the Factors section.
-                  </p>
-
-                  <div className="mt-5 grid gap-4 lg:grid-cols-3">
-                    <div className="rounded-xl border border-line bg-base/50 p-4">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-oil">1 · Base trend</p>
-                      <code className="mt-3 block whitespace-nowrap rounded-lg bg-black/40 px-3 py-2.5 font-mono text-[11px] text-slate-300">
-                        avg(t) = base × (1+CAGR)^t
-                      </code>
-                      <p className="mt-3 text-xs leading-relaxed text-slate-500">
-                        Compounds today's market price at a structural annual growth rate, with a small
-                        cyclical sine term so paths are not perfectly straight lines.
-                      </p>
+            {assumptionsOpen && (
+              <div className="border-t border-line px-6 py-6 text-sm leading-relaxed text-slate-400 sm:px-7">
+                <p>
+                  Every forecast is generated entirely in your browser using a transparent three-part
+                  model — a compounding base trend, horizon-scaled volatility bands, and small drift
+                  adjustments from the key drivers listed in the Factors section. Regional modes
+                  remap spot anchors to research-backed markers (WTI, Dated Brent, Dubai/Oman, WAF,
+                  import-parity) and retail power/water tariff levels.
+                </p>
+                <div className="mt-5 grid gap-4 md:grid-cols-3">
+                  {[
+                    {
+                      t: "1 · Base trend",
+                      f: "avg(t) = base × (1+CAGR)^t",
+                      d: "Compounds today's market price at a structural annual growth rate, with a small cyclical sine term so paths are not perfectly straight lines.",
+                    },
+                    {
+                      t: "2 · Volatility bands",
+                      f: "band(t) = avg(t) × (1 ± σ·√(t/10))",
+                      d: "Uncertainty widens with the square root of time — low/high scenarios stay tight near today and fan out over the decade.",
+                    },
+                    {
+                      t: "3 · Factor adjustments",
+                      f: "adj(t) = 1 + Σ driftᵢ × (t/10)",
+                      d: "Each key driver contributes a small cumulative drift that ramps up over the horizon, clamped to ±18%.",
+                    },
+                  ].map((b) => (
+                    <div key={b.t} className="rounded-xl border border-line bg-base/40 p-4">
+                      <p className="text-xs font-semibold text-teal-300">{b.t}</p>
+                      <p className="mt-2 font-mono text-[11px] text-slate-300">{b.f}</p>
+                      <p className="mt-2 text-xs text-slate-500">{b.d}</p>
                     </div>
-                    <div className="rounded-xl border border-line bg-base/50 p-4">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-elec">2 · Volatility bands</p>
-                      <code className="mt-3 block whitespace-nowrap rounded-lg bg-black/40 px-3 py-2.5 font-mono text-[11px] text-slate-300">
-                        band(t) = avg(t) × (1 ± σ·√(t/10))
-                      </code>
-                      <p className="mt-3 text-xs leading-relaxed text-slate-500">
-                        Uncertainty widens with the square root of time — low/high scenarios stay tight
-                        near today and fan out over the decade.
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-line bg-base/50 p-4">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-water">3 · Factor adjustments</p>
-                      <code className="mt-3 block whitespace-nowrap rounded-lg bg-black/40 px-3 py-2.5 font-mono text-[11px] text-slate-300">
-                        adj(t) = 1 + Σ driftᵢ × (t/10)
-                      </code>
-                      <p className="mt-3 text-xs leading-relaxed text-slate-500">
-                        Each key driver contributes a small cumulative drift that ramps up over the
-                        horizon, clamped to ±18%.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 overflow-x-auto rounded-xl border border-line">
-                    <table className="w-full min-w-[640px] text-sm">
-                      <thead>
-                        <tr className="border-b border-line bg-white/[0.025] text-left">
-                          <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Commodity</th>
-                          <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Base (today)</th>
-                          <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">CAGR</th>
-                          <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">σ @ 10y</th>
-                          <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Reference</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {COMMODITIES.map((c) => (
-                          <tr key={c.id} className="border-b border-line/50 last:border-0">
-                            <td className="px-4 py-3 font-semibold" style={{ color: c.color }}>{c.name}</td>
-                            <td className="px-4 py-3 font-mono text-xs text-slate-200">{fmtUsd(prices[c.id], c.decimals)} / {c.unit.replace("USD/", "")}</td>
-                            <td className="px-4 py-3 font-mono text-xs text-slate-200">+{(c.cagr * 100).toFixed(1)}%</td>
-                            <td className="px-4 py-3 font-mono text-xs text-slate-200">±{(c.maxVol * 100).toFixed(0)}%</td>
-                            <td className="px-4 py-3 text-xs text-slate-500">
-                              {c.id === "oil" ? "EIA · ICE Brent" : c.id === "electricity" ? "GlobalPetrolPrices · IEA" : "UN-Water · GWI"}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <p className="mt-4 text-[11px] leading-relaxed text-slate-600">
-                    The live feed streams automatically every 2.5s using a mean-reverting random walk,
-                    so spot prices, cards, chart and table update on their own — no clicking required.
-                    It auto-pauses when the browser tab is hidden and can be paused manually. The
-                    Refresh action applies a larger one-off shock within realistic intraday ranges
-                    (oil ±3%, power ±2.5%, water ±4%), and the live water quote is re-polled every 30s
-                    within the plausible global band of roughly $2.00–$3.40/m³.
-                  </p>
+                  ))}
                 </div>
+                <div className="mt-5 overflow-x-auto">
+                  <table className="w-full min-w-[520px] text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-line text-slate-500">
+                        <th className="py-2 pr-4 font-semibold">Commodity</th>
+                        <th className="py-2 pr-4 font-semibold">Base (today)</th>
+                        <th className="py-2 pr-4 font-semibold">CAGR</th>
+                        <th className="py-2 pr-4 font-semibold">σ @ 10y</th>
+                        <th className="py-2 font-semibold">Reference</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {COMMODITIES.map((c) => (
+                        <tr key={c.id} className="border-b border-line/50 text-slate-300">
+                          <td className="py-2.5 pr-4 font-medium">{c.name}</td>
+                          <td className="py-2.5 pr-4 tabular-nums">
+                            {fmtUsd(prices[c.id], c.decimals)} / {c.unit.replace("USD/", "")}
+                          </td>
+                          <td className="py-2.5 pr-4">+{(c.cagr * 100).toFixed(1)}%</td>
+                          <td className="py-2.5 pr-4">±{(c.maxVol * 100).toFixed(0)}%</td>
+                          <td className="py-2.5 text-slate-500">
+                            {c.id === "oil"
+                              ? "EIA · ICE Brent"
+                              : c.id === "electricity"
+                                ? "GlobalPetrolPrices · IEA"
+                                : "UN-Water · GWI"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="mt-5 text-xs text-slate-500">
+                  The live feed streams automatically every 2.5s using a mean-reverting random walk,
+                  so spot prices, cards, chart, table and regional evaluation update on their own —
+                  no clicking required. It auto-pauses when the browser tab is hidden and can be
+                  paused manually. The Refresh action applies a larger one-off shock within realistic
+                  intraday ranges (oil ±3%, power ±2.5%, water ±4%), and the live water quote is
+                  re-polled every 30s within the plausible global band of roughly $2.00–$3.40/m³.
+                </p>
               </div>
-            </div>
+            )}
           </div>
         </Reveal>
 
         {/* disclaimer */}
-        <Reveal delay={60}>
-          <div className="mt-8 flex items-start gap-3.5 rounded-2xl border border-amber-400/20 bg-amber-400/[0.05] px-5 py-4 sm:px-6">
-            <AlertTriangle className="mt-0.5 h-4.5 w-4.5 h-[18px] w-[18px] shrink-0 text-amber-400" aria-hidden="true" />
-            <p className="text-sm leading-relaxed text-amber-200/80">
-              <span className="font-semibold text-amber-200">Disclaimer.</span> These are illustrative
-              forecasts based on historical trends and publicly known drivers. Not financial advice.
-              Real commodity markets are influenced by many unpredictable factors, and actual prices
-              may differ materially from any scenario shown here.
-            </p>
-          </div>
-        </Reveal>
+        <div className="mt-6 flex gap-3 rounded-xl border border-amber-400/20 bg-amber-400/5 px-4 py-3 text-xs leading-relaxed text-amber-100/80">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+          <p>
+            <span className="font-semibold text-amber-200">Disclaimer.</span> These are illustrative
+            forecasts based on historical trends and publicly known drivers. Not financial advice.
+            Real commodity markets are influenced by many unpredictable factors, and actual prices
+            may differ materially from any scenario shown here.
+          </p>
+        </div>
 
         <p className="sr-only" aria-live="polite">
           {announce}
         </p>
-        <p className="sr-only">
+        <p className="mt-4 text-center text-[11px] text-slate-600">
           Last updated {fmtTime(lastUpdated)}. Model uses publicly available drivers.
         </p>
       </div>
