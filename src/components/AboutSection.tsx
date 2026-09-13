@@ -111,8 +111,7 @@ export default function AboutSection() {
           <div className="mt-6 flex gap-3 rounded-xl border border-amber-400/20 bg-amber-400/5 px-4 py-3.5 text-xs leading-relaxed text-amber-100/80">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
             <p>
-              <span className="font-semibold text-amber-200">Important.</span> These are illustrative
-              forecasts based on historical trends and publicly known drivers. Not financial advice.
+              <span className="font-semibold text-amber-200">Important.</span>
               The live water quote is a simulated client-side feed within a realistic global price
               band — always verify against licensed data providers before making decisions.
             </p>
