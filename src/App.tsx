@@ -1,18 +1,17 @@
 import { useCallback, useMemo, useState } from "react";
-
 import Navbar from "./components/Navbar";
 import Hero from "./components/Hero";
 import ForecastTool from "./components/ForecastTool";
+import RegionalEvaluation from "./components/RegionalEvaluation";
 import FactorsSection from "./components/FactorsSection";
 import AboutSection from "./components/AboutSection";
 import Footer from "./components/Footer";
-
-// ✅ Fixed import path (singular "hook")
 import { useLiveMarket } from "./hook/useLiveMarket";
-import { generateForecast } from "./lib/model";
+import { generateForecast, type RegionId } from "./lib/model";
 
 export default function App() {
   const [horizon, setHorizon] = useState(7);
+  const [region, setRegion] = useState<RegionId>("global");
 
   const {
     prices,
@@ -28,8 +27,8 @@ export default function App() {
   } = useLiveMarket();
 
   const points = useMemo(
-    () => generateForecast(prices, horizon, jitter),
-    [prices, horizon, jitter],
+    () => generateForecast(prices, horizon, jitter, region),
+    [prices, horizon, jitter, region],
   );
 
   const handleFetchWater = useCallback(() => void fetchWater(), [fetchWater]);
@@ -52,6 +51,15 @@ export default function App() {
           isLive={isLive}
           streaming={streaming}
           onToggleLive={toggleLive}
+          region={region}
+          onRegion={setRegion}
+        />
+        <RegionalEvaluation
+          prices={prices}
+          horizon={horizon}
+          jitter={jitter}
+          region={region}
+          onRegion={setRegion}
         />
         <FactorsSection horizon={horizon} />
         <AboutSection />
