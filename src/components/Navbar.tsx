@@ -11,7 +11,7 @@ const LINKS = [
   { href: "#about", label: "About" },
 ];
 
-const REPO_URL = "https://github.com/johndesantis/tecnoindicator";
+const REPO_URL = "https://github.com/xfst14/TecnoIndicator";
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
