@@ -1003,7 +1003,7 @@ export default function ForecastTool({
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
           <p>
             <span className="font-semibold text-amber-200">Disclaimer.</span>
-             Real commodity markets are influenced by many unpredictable factors, and actual prices
+            Real commodity markets are influenced by many unpredictable factors, and actual prices
             may differ materially from any scenario shown here.
           </p>
         </div>
