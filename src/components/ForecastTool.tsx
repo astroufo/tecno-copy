@@ -1002,8 +1002,7 @@ export default function ForecastTool({
         <div className="mt-6 flex gap-3 rounded-xl border border-amber-400/20 bg-amber-400/5 px-4 py-3 text-xs leading-relaxed text-amber-100/80">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
           <p>
-            <span className="font-semibold text-amber-200">Disclaimer.</span> These are illustrative
-            forecasts based on historical trends and publicly known drivers. Not financial advice.
+            <span className="font-semibold text-amber-200">Disclaimer.</span>
             Real commodity markets are influenced by many unpredictable factors, and actual prices
             may differ materially from any scenario shown here.
           </p>
