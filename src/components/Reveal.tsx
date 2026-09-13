@@ -8,7 +8,7 @@ interface RevealProps {
 
 /** Fades + slides content in when it scrolls into view. */
 export default function Reveal({ children, className = "", delay = 0 }: RevealProps) {
-  const ref = useRef<HTMLDivElement | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
   const [inView, setInView] = useState(false);
 
   useEffect(() => {
@@ -33,7 +33,7 @@ export default function Reveal({ children, className = "", delay = 0 }: RevealPr
     <div
       ref={ref}
       className={`reveal ${inView ? "in-view" : ""} ${className}`}
-      style={{ animationDelay: `${delay}ms` }}
+      style={delay ? { animationDelay: `${delay}ms` } : undefined}
     >
       {children}
     </div>

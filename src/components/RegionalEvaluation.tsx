@@ -1,0 +1,662 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  BarController,
+  BarElement,
+  CategoryScale,
+  Chart,
+  Legend,
+  LinearScale,
+  Tooltip,
+} from "chart.js";
+import type { ChartConfiguration, TooltipItem } from "chart.js";
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  Download,
+  Droplets,
+  Fuel,
+  Gauge,
+  Globe2,
+  TrendingUp,
+  Zap,
+} from "lucide-react";
+import Reveal from "./Reveal";
+import { useFlash } from "../hook/useFlash";
+import {
+  buildRegionalCSV,
+  COMMODITIES,
+  downloadFile,
+  evaluateRegions,
+  fmtUsd,
+  hexToRgba,
+  START_YEAR,
+  type CommodityId,
+  type RegionEvaluation,
+  type RegionId,
+} from "../lib/model";
+
+Chart.register(BarController, BarElement, CategoryScale, Legend, LinearScale, Tooltip);
+
+const COMM_META: Record<
+  CommodityId,
+  { label: string; icon: typeof Fuel; color: string; decimals: number; unit: string }
+> = {
+  oil: { label: "Oil", icon: Fuel, color: "#f5b840", decimals: 1, unit: "bbl" },
+  electricity: { label: "Power", icon: Zap, color: "#2dd4bf", decimals: 0, unit: "MWh" },
+  water: { label: "Water", icon: Droplets, color: "#38bdf8", decimals: 2, unit: "m³" },
+};
+
+function ScoreRing({ score, color }: { score: number; color: string }) {
+  const r = 28;
+  const c = 2 * Math.PI * r;
+  const offset = c - (score / 100) * c;
+  return (
+    <div className="relative h-16 w-16 shrink-0">
+      <svg viewBox="0 0 72 72" className="h-full w-full -rotate-90">
+        <circle cx="36" cy="36" r={r} fill="none" stroke="rgba(27,39,64,1)" strokeWidth="6" />
+        <circle
+          cx="36"
+          cy="36"
+          r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth="6"
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={offset}
+          className="transition-all duration-700"
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="font-display text-sm font-bold text-white">{score}</span>
+      </div>
+    </div>
+  );
+}
+
+function DeltaBadge({ value }: { value: number }) {
+  const up = value >= 0;
+  return (
+    <span
+      className={`inline-flex items-center gap-0.5 text-[11px] font-semibold ${
+        up ? "text-rose-300" : "text-emerald-300"
+      }`}
+    >
+      {up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+      {up ? "+" : "−"}
+      {Math.abs(value).toFixed(1)}%
+    </span>
+  );
+}
+
+function RegionCard({
+  ev,
+  selected,
+  onSelect,
+  rank,
+}: {
+  ev: RegionEvaluation;
+  selected: boolean;
+  onSelect: () => void;
+  rank: number;
+}) {
+  const oilFlash = useFlash(ev.spots.oil);
+  const elecFlash = useFlash(ev.spots.electricity);
+  const waterFlash = useFlash(ev.spots.water);
+  const flashes: Record<CommodityId, string> = {
+    oil: oilFlash,
+    electricity: elecFlash,
+    water: waterFlash,
+  };
+
+  const outlookColor =
+    ev.outlook === "bullish"
+      ? "text-rose-300 border-rose-400/30 bg-rose-400/10"
+      : ev.outlook === "bearish"
+        ? "text-emerald-300 border-emerald-400/30 bg-emerald-400/10"
+        : "text-slate-300 border-line bg-white/[0.03]";
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      className={`group w-full rounded-2xl border p-5 text-left transition-all duration-300 ${
+        selected
+          ? "border-teal-400/45 bg-teal-400/[0.07] shadow-[0_0_32px_rgba(45,212,191,0.12)]"
+          : "border-line bg-panel/60 hover:border-line-strong hover:bg-panel"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-line bg-base/50 text-xl">
+            {ev.region.flag}
+          </span>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-display text-base font-semibold text-white">
+                {ev.region.name}
+              </h3>
+              <span className="rounded-full border border-line bg-base/40 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
+                #{rank}
+              </span>
+            </div>
+            <p className="mt-0.5 text-[11px] text-slate-500">{ev.region.oilMarker}</p>
+          </div>
+        </div>
+        <ScoreRing score={ev.score} color={ev.region.accent} />
+      </div>
+
+      <p className="mt-3 text-xs leading-relaxed text-slate-500 line-clamp-2">{ev.region.blurb}</p>
+
+      <div className="mt-4 grid grid-cols-3 gap-2">
+        {COMMODITIES.map((c) => {
+          const meta = COMM_META[c.id];
+          return (
+            <div
+              key={c.id}
+              className="rounded-xl border border-line bg-base/40 px-2.5 py-2.5"
+            >
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                {meta.label}
+              </p>
+              <p
+                className={`mt-1 font-display text-sm font-bold tabular-nums text-slate-100 ${flashes[c.id]}`}
+              >
+                {fmtUsd(ev.spots[c.id], meta.decimals)}
+              </p>
+              <div className="mt-1">
+                <DeltaBadge value={ev.deltaPct[c.id]} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-4 flex items-center justify-between gap-2">
+        <span
+          className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${outlookColor}`}
+        >
+          {ev.outlook} outlook
+        </span>
+        <span className="text-[11px] text-slate-600">
+          vs global power{" "}
+          <span className="font-semibold text-slate-400">
+            {ev.vsGlobalPct.electricity >= 0 ? "+" : ""}
+            {ev.vsGlobalPct.electricity.toFixed(0)}%
+          </span>
+        </span>
+      </div>
+    </button>
+  );
+}
+
+interface RegionalEvaluationProps {
+  prices: Record<CommodityId, number>;
+  horizon: number;
+  jitter: number;
+  region: RegionId;
+  onRegion: (r: RegionId) => void;
+}
+
+export default function RegionalEvaluation({
+  prices,
+  horizon,
+  jitter,
+  region,
+  onRegion,
+}: RegionalEvaluationProps) {
+  const evals = useMemo(
+    () => evaluateRegions(prices, horizon, jitter),
+    [prices, horizon, jitter],
+  );
+  const [focusCommodity, setFocusCommodity] = useState<CommodityId>("electricity");
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef<Chart<"bar", number[], string> | null>(null);
+  const horizonYear = START_YEAR + horizon;
+
+  const selected = evals.find((e) => e.region.id === region) ?? evals[0];
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const labels = evals.map((e) => e.region.short);
+    const spotData = evals.map((e) => e.spots[focusCommodity]);
+    const horizonData = evals.map((e) => e.horizon[focusCommodity].avg);
+    const color = COMM_META[focusCommodity].color;
+
+    const config: ChartConfiguration<"bar", number[], string> = {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: `Spot ${START_YEAR}`,
+            data: spotData,
+            backgroundColor: hexToRgba(color, 0.35),
+            borderColor: hexToRgba(color, 0.55),
+            borderWidth: 1,
+            borderRadius: 6,
+            maxBarThickness: 28,
+          },
+          {
+            label: `Forecast ${horizonYear}`,
+            data: horizonData,
+            backgroundColor: hexToRgba(color, 0.85),
+            borderRadius: 6,
+            maxBarThickness: 28,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 420, easing: "easeOutQuart" },
+        plugins: {
+          legend: {
+            position: "bottom",
+            labels: {
+              color: "rgba(219,228,240,0.75)",
+              boxWidth: 12,
+              usePointStyle: true,
+              pointStyle: "rectRounded",
+              padding: 14,
+              font: { family: "Inter", size: 11 },
+            },
+          },
+          tooltip: {
+            backgroundColor: "rgba(10,17,34,0.95)",
+            borderColor: "#1b2740",
+            borderWidth: 1,
+            titleColor: "#f1f5f9",
+            bodyColor: "#dbe4f0",
+            padding: 12,
+            cornerRadius: 10,
+            callbacks: {
+              label: (ctx: TooltipItem<"bar">) => {
+                const d = COMM_META[focusCommodity].decimals;
+                return ` ${ctx.dataset.label}: ${fmtUsd(Number(ctx.parsed.y), d)}`;
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            border: { color: "#1b2740" },
+            ticks: {
+              color: "rgba(219,228,240,0.65)",
+              font: { family: "Inter", size: 11 },
+            },
+          },
+          y: {
+            grid: { color: "rgba(148,163,184,0.07)" },
+            border: { display: false },
+            ticks: {
+              color: "rgba(219,228,240,0.55)",
+              font: { family: "Inter", size: 10 },
+            },
+          },
+        },
+      },
+    };
+
+    if (!chartRef.current) {
+      chartRef.current = new Chart(canvas, config);
+    } else {
+      chartRef.current.data = config.data;
+      chartRef.current.update();
+    }
+
+    return () => {
+      // keep chart instance across commodity toggles; destroy on unmount only
+    };
+  }, [evals, focusCommodity, horizonYear]);
+
+  useEffect(() => {
+    return () => {
+      chartRef.current?.destroy();
+      chartRef.current = null;
+    };
+  }, []);
+
+  const exportRegional = () => {
+    downloadFile(
+      `tecnoindicator-regions-${horizon}y.csv`,
+      buildRegionalCSV(evals, horizonYear),
+      "text/csv;charset=utf-8",
+    );
+  };
+
+  const cheapestPower = [...evals].sort(
+    (a, b) => a.spots.electricity - b.spots.electricity,
+  )[0];
+  const dearestWater = [...evals].sort((a, b) => b.spots.water - a.spots.water)[0];
+  const topScore = evals[0];
+
+  return (
+    <section id="regions" className="relative scroll-mt-20 border-t border-line py-16 sm:py-20">
+      <div className="pointer-events-none absolute inset-0 bg-grid opacity-40 mask-fade-y" />
+      <div className="relative mx-auto max-w-7xl px-5 sm:px-8">
+        <Reveal>
+          <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-teal-300/80">
+                Regional intelligence
+              </p>
+              <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                Evaluate 5 world regions
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-400">
+                Live oil, electricity and water prices mapped to Americas, Europe, Asia, Africa and
+                Oceania using research-backed regional markers — WTI, Dated Brent, Dubai/Oman, West
+                African sweet and import-parity crude, plus retail power and municipal water
+                tariffs. Scores update automatically with the live feed.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={exportRegional}
+              className="inline-flex items-center gap-2 self-start rounded-xl border border-line bg-white/[0.03] px-4 py-2.5 text-xs font-semibold text-slate-200 transition-all hover:border-teal-400/40 hover:text-white"
+            >
+              <Download className="h-3.5 w-3.5 text-teal-300" />
+              Export region CSV
+            </button>
+          </div>
+        </Reveal>
+
+        {/* insight chips */}
+        <Reveal delay={60}>
+          <div className="mb-6 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-line bg-panel/60 p-4">
+              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                <Gauge className="h-3.5 w-3.5 text-teal-300" />
+                Best composite score
+              </div>
+              <p className="mt-2 font-display text-lg font-semibold text-white">
+                {topScore.region.flag} {topScore.region.name}{" "}
+                <span className="text-teal-300">{topScore.score}/100</span>
+              </p>
+            </div>
+            <div className="rounded-2xl border border-line bg-panel/60 p-4">
+              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                <Zap className="h-3.5 w-3.5 text-elec" />
+                Lowest power tariff
+              </div>
+              <p className="mt-2 font-display text-lg font-semibold text-white">
+                {cheapestPower.region.flag} {cheapestPower.region.name}{" "}
+                <span className="text-elec">
+                  {fmtUsd(cheapestPower.spots.electricity, 0)}/MWh
+                </span>
+              </p>
+            </div>
+            <div className="rounded-2xl border border-line bg-panel/60 p-4">
+              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                <Droplets className="h-3.5 w-3.5 text-water" />
+                Highest water tariff
+              </div>
+              <p className="mt-2 font-display text-lg font-semibold text-white">
+                {dearestWater.region.flag} {dearestWater.region.name}{" "}
+                <span className="text-water">{fmtUsd(dearestWater.spots.water, 2)}/m³</span>
+              </p>
+            </div>
+          </div>
+        </Reveal>
+
+        {/* region cards */}
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {evals.map((ev, i) => (
+            <Reveal key={ev.region.id} delay={80 + i * 50}>
+              <RegionCard
+                ev={ev}
+                rank={i + 1}
+                selected={region === ev.region.id || (region === "global" && i === 0)}
+                onSelect={() => onRegion(ev.region.id)}
+              />
+            </Reveal>
+          ))}
+        </div>
+
+        {/* comparison chart + detail */}
+        <div className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+          <Reveal delay={140}>
+            <div className="rounded-2xl border border-line bg-panel/60 p-5 sm:p-6">
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="font-display text-lg font-semibold text-white">
+                    Cross-region comparison
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Spot vs {horizon}-year average forecast by region
+                  </p>
+                </div>
+                <div className="flex rounded-lg border border-line bg-base/50 p-0.5">
+                  {(Object.keys(COMM_META) as CommodityId[]).map((id) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setFocusCommodity(id)}
+                      aria-pressed={focusCommodity === id}
+                      className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+                        focusCommodity === id
+                          ? "bg-teal-400 text-slate-950 shadow-[0_0_16px_rgba(45,212,191,0.35)]"
+                          : "text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      {COMM_META[id].label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="h-[300px] w-full sm:h-[340px]">
+                <canvas ref={canvasRef} aria-label="Regional price comparison chart" />
+              </div>
+            </div>
+          </Reveal>
+
+          <Reveal delay={180}>
+            <div className="flex h-full flex-col rounded-2xl border border-line bg-panel/60 p-5 sm:p-6">
+              <div className="flex items-center gap-3">
+                <span className="flex h-12 w-12 items-center justify-center rounded-xl border border-line bg-base/50 text-2xl">
+                  {selected.region.flag}
+                </span>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Deep dive
+                  </p>
+                  <h3 className="font-display text-xl font-semibold text-white">
+                    {selected.region.name}
+                  </h3>
+                </div>
+              </div>
+
+              <p className="mt-4 text-sm leading-relaxed text-slate-400">{selected.region.blurb}</p>
+
+              <div className="mt-5 space-y-3">
+                {COMMODITIES.map((c) => {
+                  const meta = COMM_META[c.id];
+                  const Icon = meta.icon;
+                  return (
+                    <div
+                      key={c.id}
+                      className="rounded-xl border border-line bg-base/40 px-3.5 py-3"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="inline-flex items-center gap-2 text-xs font-semibold text-slate-300">
+                          <Icon className="h-3.5 w-3.5" style={{ color: meta.color }} />
+                          {meta.label}
+                          <span className="font-normal text-slate-600">
+                            USD/{meta.unit}
+                          </span>
+                        </span>
+                        <DeltaBadge value={selected.deltaPct[c.id]} />
+                      </div>
+                      <div className="mt-2 flex items-end justify-between gap-2">
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wider text-slate-600">
+                            Spot
+                          </p>
+                          <p className="font-display text-base font-bold tabular-nums text-white">
+                            {fmtUsd(selected.spots[c.id], meta.decimals)}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] uppercase tracking-wider text-slate-600">
+                            {horizonYear} avg
+                          </p>
+                          <p className="font-display text-base font-bold tabular-nums text-slate-200">
+                            {fmtUsd(selected.horizon[c.id].avg, meta.decimals)}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] uppercase tracking-wider text-slate-600">
+                            vs world
+                          </p>
+                          <p className="font-display text-sm font-semibold tabular-nums text-slate-400">
+                            {selected.vsGlobalPct[c.id] >= 0 ? "+" : ""}
+                            {selected.vsGlobalPct[c.id].toFixed(1)}%
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Key regional drivers
+                </p>
+                <ul className="mt-2 space-y-1.5">
+                  {selected.region.drivers.map((d) => (
+                    <li
+                      key={d}
+                      className="flex items-start gap-2 text-xs text-slate-400"
+                    >
+                      <TrendingUp
+                        className="mt-0.5 h-3 w-3 shrink-0"
+                        style={{ color: selected.region.accent }}
+                      />
+                      {d}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  onRegion(selected.region.id);
+                  document.getElementById("forecast")?.scrollIntoView({ behavior: "smooth" });
+                }}
+                className="mt-auto inline-flex items-center justify-center gap-2 rounded-xl bg-teal-400 px-4 py-2.5 text-xs font-semibold text-slate-950 transition-all hover:bg-teal-300"
+              >
+                <Globe2 className="h-3.5 w-3.5" />
+                Open {selected.region.short} in forecast studio
+              </button>
+            </div>
+          </Reveal>
+        </div>
+
+        {/* comparison table */}
+        <Reveal delay={200}>
+          <div className="mt-6 overflow-hidden rounded-2xl border border-line bg-panel/60">
+            <div className="border-b border-line px-5 py-4 sm:px-6">
+              <h3 className="font-display text-lg font-semibold text-white">
+                Regional scoreboard
+              </h3>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Live spots, {horizon}-year averages and premium/discount vs global · ranked by
+                composite affordability score
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-line bg-base/40 text-[11px] uppercase tracking-wider text-slate-500">
+                    <th className="px-5 py-3 font-semibold sm:px-6">Region</th>
+                    <th className="px-3 py-3 text-center font-semibold text-oil">Oil spot</th>
+                    <th className="px-3 py-3 text-center font-semibold text-oil">
+                      Oil {horizonYear}
+                    </th>
+                    <th className="px-3 py-3 text-center font-semibold text-elec">Power spot</th>
+                    <th className="px-3 py-3 text-center font-semibold text-elec">
+                      Power {horizonYear}
+                    </th>
+                    <th className="px-3 py-3 text-center font-semibold text-water">Water spot</th>
+                    <th className="px-3 py-3 text-center font-semibold text-water">
+                      Water {horizonYear}
+                    </th>
+                    <th className="px-3 py-3 text-center font-semibold">Score</th>
+                    <th className="px-5 py-3 text-center font-semibold sm:px-6">Outlook</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {evals.map((e, idx) => (
+                    <tr
+                      key={e.region.id}
+                      className={`border-b border-line/60 transition-colors hover:bg-white/[0.02] ${
+                        region === e.region.id ? "bg-teal-400/[0.05]" : ""
+                      }`}
+                    >
+                      <td className="px-5 py-3 sm:px-6">
+                        <button
+                          type="button"
+                          onClick={() => onRegion(e.region.id)}
+                          className="flex items-center gap-2.5 text-left"
+                        >
+                          <span className="text-lg">{e.region.flag}</span>
+                          <span>
+                            <span className="block font-display font-semibold text-slate-100">
+                              {e.region.name}
+                            </span>
+                            <span className="text-[11px] text-slate-600">
+                              #{idx + 1} · {e.region.oilMarker}
+                            </span>
+                          </span>
+                        </button>
+                      </td>
+                      <td className="px-3 py-3 text-center tabular-nums text-slate-200">
+                        {fmtUsd(e.spots.oil, 1)}
+                      </td>
+                      <td className="px-3 py-3 text-center tabular-nums text-slate-400">
+                        {fmtUsd(e.horizon.oil.avg, 1)}
+                      </td>
+                      <td className="px-3 py-3 text-center tabular-nums text-slate-200">
+                        {fmtUsd(e.spots.electricity, 0)}
+                      </td>
+                      <td className="px-3 py-3 text-center tabular-nums text-slate-400">
+                        {fmtUsd(e.horizon.electricity.avg, 0)}
+                      </td>
+                      <td className="px-3 py-3 text-center tabular-nums text-slate-200">
+                        {fmtUsd(e.spots.water, 2)}
+                      </td>
+                      <td className="px-3 py-3 text-center tabular-nums text-slate-400">
+                        {fmtUsd(e.horizon.water.avg, 2)}
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <span
+                          className="inline-flex min-w-[2.5rem] justify-center rounded-full px-2 py-0.5 font-display text-sm font-bold"
+                          style={{
+                            color: e.region.accent,
+                            background: `${e.region.accent}18`,
+                          }}
+                        >
+                          {e.score}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-center capitalize text-xs font-semibold text-slate-400 sm:px-6">
+                        {e.outlook}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </Reveal>
+      </div>
+    </section>
+  );
+}

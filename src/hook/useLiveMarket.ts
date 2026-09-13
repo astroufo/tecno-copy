@@ -1,22 +1,21 @@
-// src/hooks/useLiveMarket.ts
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   COMMODITIES,
   fetchLiveWaterPrice,
   perturbPrices,
+  tickPrices,
+  TICK_MS,
+  WATER_POLL_MS,
   type CommodityId,
   type LiveWaterQuote,
-} from '../lib/model';
+} from "../lib/model";
 
-/** Builds initial prices from COMMODITIES base values. */
 function getInitialPrices(): Record<CommodityId, number> {
-  return Object.fromEntries(
-    COMMODITIES.map((c) => [c.id, c.base]),
-  ) as Record<CommodityId, number>;
+  return Object.fromEntries(COMMODITIES.map((c) => [c.id, c.base])) as Record<
+    CommodityId,
+    number
+  >;
 }
-
-/** Polling interval (ms) when live-streaming is enabled. */
-const STREAM_INTERVAL_MS = 8_000;
 
 export interface UseLiveMarketReturn {
   prices: Record<CommodityId, number>;
@@ -37,19 +36,17 @@ export function useLiveMarket(): UseLiveMarketReturn {
   const [lastUpdated, setLastUpdated] = useState(() => new Date());
   const [waterLive, setWaterLive] = useState<LiveWaterQuote | null>(null);
   const [waterFetching, setWaterFetching] = useState(false);
-  const [isLive, setIsLive] = useState(false);
-  const [streaming, setStreaming] = useState(false);
+  const [isLive, setIsLive] = useState(true);
+  const [streaming, setStreaming] = useState(true);
+  const tickRef = useRef<number | null>(null);
+  const waterRef = useRef<number | null>(null);
 
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  /** One-shot refresh: perturb all prices. */
   const refresh = useCallback(() => {
     setPrices((cur) => perturbPrices(cur));
     setJitter((j) => j + Math.random());
     setLastUpdated(new Date());
   }, []);
 
-  /** Fetch real-time water futures price. */
   const fetchWater = useCallback(async () => {
     setWaterFetching(true);
     try {
@@ -59,40 +56,74 @@ export function useLiveMarket(): UseLiveMarketReturn {
       setJitter((j) => j + Math.random());
       setLastUpdated(new Date());
     } catch (err) {
-      console.error('Failed to fetch live water price:', err);
+      console.error("Failed to fetch live water price:", err);
     } finally {
       setWaterFetching(false);
     }
   }, []);
 
-  /** Toggle auto-streaming (simulated live feed via periodic perturb). */
   const toggleLive = useCallback(() => {
     setIsLive((prev) => !prev);
   }, []);
 
-  // Start / stop the streaming interval when isLive changes.
+  // Auto-streaming mean-reverting ticks — no refresh button required
   useEffect(() => {
-    if (isLive) {
-      setStreaming(true);
-      intervalRef.current = setInterval(() => {
-        setPrices((cur) => perturbPrices(cur));
-        setJitter((j) => j + Math.random());
-        setLastUpdated(new Date());
-      }, STREAM_INTERVAL_MS);
-    } else {
-      setStreaming(false);
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
+    const clear = () => {
+      if (tickRef.current) {
+        clearInterval(tickRef.current);
+        tickRef.current = null;
       }
-    }
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
+      if (waterRef.current) {
+        clearInterval(waterRef.current);
+        waterRef.current = null;
       }
     };
+
+    const start = () => {
+      clear();
+      if (!isLive || document.hidden) {
+        setStreaming(false);
+        return;
+      }
+      setStreaming(true);
+      tickRef.current = window.setInterval(() => {
+        setPrices((cur) => tickPrices(cur));
+        setJitter((j) => j + 0.01);
+        setLastUpdated(new Date());
+      }, TICK_MS);
+
+      waterRef.current = window.setInterval(() => {
+        void fetchLiveWaterPrice().then((quote) => {
+          setWaterLive(quote);
+          setPrices((cur) => ({ ...cur, water: quote.price }));
+          setLastUpdated(new Date());
+        });
+      }, WATER_POLL_MS);
+    };
+
+    start();
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        clear();
+        setStreaming(false);
+      } else if (isLive) {
+        start();
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      clear();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [isLive]);
+
+  // Initial water quote
+  useEffect(() => {
+    void fetchWater();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return {
     prices,
