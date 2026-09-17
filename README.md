@@ -68,7 +68,7 @@ We welcome contributions from everyone, including **AI-generated and AI-assisted
 - **AI-generated / AI-assisted contributions are explicitly allowed**, but **you must rigorously test the codebase** before pushing to the main repository.
 - Always run the site in multiple browsers and test responsiveness, chart rendering, data exports, and edge cases (horizon = 1 and horizon = 10).
 - Open a Pull Request with a clear description of changes.
-- You are required to justify why your UI looks better and more consistent compared to the original one (e.g better functionality, etc...) if your Pull Requests has a different UI from the original.
+- You are required to justify why your UI looks better and more consistent compared to the original one (e.g better functionality, etc...) if your Pull Requests has a different UI from the original or if you want to remove a feature.
 - Ensure that your code has to work via the autotester before submitting a Pull Request.
 - Reference any related issues.
 
