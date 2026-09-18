@@ -1,4 +1,4 @@
-import { nanoid } from "crypto";
+import crypto from "crypto";
 import {
   KILO_GATEWAY_BASE_URL,
   KILO_GATEWAY_MODELS_URL,
@@ -14,6 +14,13 @@ import {
 } from "./http";
 import { getCache, setCache } from "./cache";
 import { KiloResponse, KiloStatus } from "./types";
+
+function makeId(prefix = "chatcmpl"): string {
+  if (typeof crypto.randomUUID === "function") {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+  return `${prefix}-${crypto.randomBytes(12).toString("hex")}`;
+}
 
 export interface KiloKeyState {
   keyIndex: number;
@@ -563,7 +570,9 @@ export class KiloRouter {
   private shuffle<T>(array: T[]): T[] {
     const result = [...array];
     for (let i = result.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const cryptoArray = new Uint32Array(1);
+      crypto.randomFillSync(cryptoArray);
+      const j = cryptoArray[0] % (i + 1);
       [result[i], result[j]] = [result[j], result[i]];
     }
     return result;
