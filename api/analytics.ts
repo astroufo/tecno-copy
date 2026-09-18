@@ -1,13 +1,10 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { getGlobalAnalytics, clearAnalyticsCache } from "./_shared/deterministicAnalytics";
 import { ANALYTICS_CACHE_MS } from "./_shared/http";
 
-export default async function handler(
-  req: VercelRequest,
-  res: VercelResponse
-): Promise<void> {
+export default function handler(req: any, res: any): void {
   try {
-    const forceRefresh = req.query.force === "true";
+    const url = new URL(req.url, "http://localhost");
+    const forceRefresh = url.searchParams.get("force") === "true";
 
     if (forceRefresh) {
       clearAnalyticsCache();
