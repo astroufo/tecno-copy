@@ -31,11 +31,20 @@ export const ACCESS_PROBE_CACHE_MS = 5 * 60_000;
 export const FORECAST_CACHE_MS = 5 * 60_000;
 export const GLOBAL_RATE_LIMIT_BACKOFF_MS = [1000, 2000, 4000];
 
-export function readConfiguredKeys(envNames: readonly string[]): string[] {
-  return envNames
-    .map((name) => process.env[name])
-    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
-    .map((value) => value.trim());
+export interface ConfiguredKey {
+  envName: string;
+  value: string;
+}
+
+export function readConfiguredKeys(envNames: readonly string[]): ConfiguredKey[] {
+  const keys: ConfiguredKey[] = [];
+  for (const envName of envNames) {
+    const raw = process.env[envName];
+    if (typeof raw === "string" && raw.trim().length > 0) {
+      keys.push({ envName, value: raw.trim() });
+    }
+  }
+  return keys;
 }
 
 export function parsePositiveNumber(value: unknown, fallback: number): number {
