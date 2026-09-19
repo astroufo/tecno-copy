@@ -146,7 +146,7 @@ function normalizeFactor(raw: unknown, scope: Region, region: Region): Factor | 
     id: id.slice(0, 80),
     name: name.slice(0, 160),
     category: category.slice(0, 80),
-    commodities: [...new Set(commodities)] as Factor["commodities"],
+    commodities: Array.from(new Set(commodities)) as Factor["commodities"],
     explanation: explanation.slice(0, 1200),
     direction,
     magnitude,
@@ -160,7 +160,7 @@ drift:
             ...(typeof (f.drift as Record<string, unknown>).water === "number" && Number.isFinite((f.drift as Record<string, unknown>).water) ? { water: (f.drift as Record<string, unknown>).water as number } : {}),
           }
         : {},
-    regions: [...new Set(regions)] as Factor["regions"],
+    regions: Array.from(new Set(regions)) as Factor["regions"],
     scope,
     importanceScore,
     createdAt: new Date().toISOString(),

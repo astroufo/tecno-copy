@@ -1,11 +1,11 @@
 import { kiloRouter } from "./_shared/kiloRouter";
 import { tinyfishRouter } from "./_shared/tinyfishRouter";
-import { REGION_NAMES, type Region, isRegion } from "./_shared/regions";
+import { REGION_NAMES, type Region } from "./_shared/regions";
 import { getGlobalAnalytics, getRegionalAnalytics } from "./_shared/deterministicAnalytics";
 import { FACTORS_CACHE_MS, sanitizeUrl } from "./_shared/http";
 import { getCache, setCache } from "./_shared/cache";
 import { safeParseJson, sanitizeError } from "./_shared/validation";
-import type { Factor, CommodityId } from "./_shared/types";
+import type { Factor } from "./_shared/types";
 
 const MAX_FACTORS = 8;
 const SYSTEM_PROMPT_GLOBAL =
@@ -161,7 +161,7 @@ function normalizeFactor(raw: unknown, scope: "global" | Region, region: Region 
     id: id.slice(0, 80),
     name: name.slice(0, 160),
     category: category.slice(0, 80),
-    commodities: [...new Set(commodities)] as Factor["commodities"],
+    commodities: Array.from(new Set(commodities)) as Factor["commodities"],
     explanation: explanation.slice(0, 1200),
     direction,
     magnitude,
@@ -175,7 +175,7 @@ drift:
             ...(typeof (f.drift as Record<string, unknown>).water === "number" && Number.isFinite((f.drift as Record<string, unknown>).water) ? { water: (f.drift as Record<string, unknown>).water as number } : {}),
           }
         : {},
-    regions: [...new Set(regions)] as Factor["regions"],
+    regions: Array.from(new Set(regions)) as Factor["regions"],
     scope,
     importanceScore,
     createdAt: new Date().toISOString(),

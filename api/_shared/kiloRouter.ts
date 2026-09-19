@@ -1,4 +1,4 @@
-import crypto from "crypto";
+import { randomBytes, randomFillSync } from "crypto";
 import {
   KILO_GATEWAY_MODELS_URL,
   KILO_GATEWAY_CHAT_URL,
@@ -13,10 +13,11 @@ import { getCache, setCache } from "./cache";
 import { KiloResponse, KiloStatus } from "./types";
 
 function makeId(prefix = "chatcmpl"): string {
-  if (typeof crypto.randomUUID === "function") {
-    return `${prefix}-${crypto.randomUUID()}`;
+  if (typeof randomBytes === "function") {
+    return `${prefix}-${randomBytes(12).toString("hex")}`;
   }
-  return `${prefix}-${crypto.randomBytes(12).toString("hex")}`;
+  // Fallback for environments without crypto.randomBytes
+  return `${prefix}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
 export interface KiloKeyState {
@@ -568,7 +569,7 @@ const result: KiloResponse = {
     const result = [...array];
     for (let i = result.length - 1; i > 0; i--) {
       const cryptoArray = new Uint32Array(1);
-      crypto.randomFillSync(cryptoArray);
+      randomFillSync(cryptoArray);
       const j = cryptoArray[0] % (i + 1);
       [result[i], result[j]] = [result[j], result[i]];
     }
