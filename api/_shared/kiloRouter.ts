@@ -221,7 +221,7 @@ export class KiloRouter {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.KILO_GATEWAY_KEY_${keyState.keyIndex + 1} ?? ""}`,
+          Authorization: `Bearer ${process.env[`KILO_GATEWAY_KEY_${keyState.keyIndex + 1}`] ?? ""}`,
         },
         body: JSON.stringify({
           model: modelCandidate.modelId,
@@ -407,7 +407,7 @@ export class KiloRouter {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${process.env.KILO_GATEWAY_KEY_${keyIndex + 1} ?? ""}`,
+              Authorization: `Bearer ${process.env[`KILO_GATEWAY_KEY_${keyIndex + 1}`] ?? ""}`,
             },
             body: JSON.stringify({
               model: modelCandidate.modelId,
