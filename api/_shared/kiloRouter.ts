@@ -8,9 +8,9 @@ import {
   MODEL_CACHE_MS,
   readConfiguredKeys,
   isGlobalRateLimitStatus,
-} from "./http";
-import { getCache, setCache } from "./cache";
-import { KiloResponse, KiloStatus } from "./types";
+} from "./http.js";
+import { getCache, setCache } from "./cache.js";
+import { KiloResponse, KiloStatus } from "./types.js";
 
 function makeId(prefix = "chatcmpl"): string {
   if (typeof randomBytes === "function") {

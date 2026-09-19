@@ -1,5 +1,5 @@
-export { REGIONS, REGION_LABELS, REGION_NAMES, isRegion, isCommodity } from "./regions";
-export type { Region } from "./regions";
+export { REGIONS, REGION_LABELS, REGION_NAMES, isRegion, isCommodity } from "./regions.js";
+export type { Region } from "./regions.js";
 
 export const KILO_GATEWAY_BASE_URL = "https://api.kilo.ai/api/gateway";
 export const KILO_GATEWAY_MODELS_URL = `${KILO_GATEWAY_BASE_URL}/models`;

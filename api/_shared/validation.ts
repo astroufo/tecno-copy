@@ -1,4 +1,4 @@
-import { isRegion, type Region } from "./regions";
+import { isRegion, type Region } from "./regions.js";
 
 export function validateRegionParam(
   searchParams: { get: (key: string) => string | null },

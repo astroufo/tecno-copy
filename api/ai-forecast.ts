@@ -1,8 +1,8 @@
-import { kiloRouter } from "./_shared/kiloRouter";
-import { getGlobalAnalytics } from "./_shared/deterministicAnalytics";
-import { FORECAST_CACHE_MS } from "./_shared/http";
-import { getCache, setCache } from "./_shared/cache";
-import { safeParseJson } from "./_shared/validation";
+import { kiloRouter } from "./_shared/kiloRouter.js";
+import { getGlobalAnalytics } from "./_shared/deterministicAnalytics.js";
+import { FORECAST_CACHE_MS } from "./_shared/http.js";
+import { getCache, setCache } from "./_shared/cache.js";
+import { safeParseJson } from "./_shared/validation.js";
 
 const SYSTEM_PROMPT_GLOBAL =
   "You are a quantitative commodities forecasting system. Use the supplied global analytics snapshot, global dynamic factors, and historical series to produce 1–10 year global forecasts for oil, electricity, and water.\n\nEmulate LSTM-style sequence continuation, Temporal Fusion Transformer-style multi-horizon attention, XGBoost-style feature-importance reasoning, and Bayesian Neural Network-style uncertainty bands.\n\nRespect the current global analytics values as the year-zero anchors. Avoid unrealistic discontinuities unless they are supported by supplied high-importance global factors.\n\nReturn strict JSON only matching the required ForecastPoint[] schema. Do not include markdown or commentary outside JSON.";
