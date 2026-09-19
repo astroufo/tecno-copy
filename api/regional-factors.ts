@@ -152,12 +152,12 @@ function normalizeFactor(raw: unknown, scope: Region, region: Region): Factor | 
     magnitude,
     source: sourceUrl,
     bias,
-    drift:
+drift:
       f.drift && typeof f.drift === "object"
         ? {
-            ...(typeof f.drift.oil === "number" && Number.isFinite(f.drift.oil) ? { oil: f.drift.oil } : {}),
-            ...(typeof f.drift.electricity === "number" && Number.isFinite(f.drift.electricity) ? { electricity: f.drift.electricity } : {}),
-            ...(typeof f.drift.water === "number" && Number.isFinite(f.drift.water) ? { water: f.drift.water } : {}),
+            ...(typeof (f.drift as Record<string, unknown>).oil === "number" && Number.isFinite((f.drift as Record<string, unknown>).oil) ? { oil: (f.drift as Record<string, unknown>).oil } : {}),
+            ...(typeof (f.drift as Record<string, unknown>).electricity === "number" && Number.isFinite((f.drift as Record<string, unknown>).electricity) ? { electricity: (f.drift as Record<string, unknown>).electricity } : {}),
+            ...(typeof (f.drift as Record<string, unknown>).water === "number" && Number.isFinite((f.drift as Record<string, unknown>).water) ? { water: (f.drift as Record<string, unknown>).water } : {}),
           }
         : {},
     regions: [...new Set(regions)] as Factor["regions"],
@@ -254,7 +254,7 @@ async function runFactorAnalysis(scope: Region, region: Region): Promise<Factor[
         content: JSON.stringify({
           analytics,
           existingFactors: existing,
-          candidates: excerpts.map((c) => ({ title: c.title, source: c.url, snippet: c.snippet?.slice(0, 2500), text: c.text?.slice(0, 8000) })),
+          candidates: excerpts.map((c) => ({ title: c.title, source: c.url, snippet: c.snippet?.slice(0, 2500), text: (c as any).text?.slice(0, 8000) })),
           region,
           month: RECENT_MONTH(),
         }),

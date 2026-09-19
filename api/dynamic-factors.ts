@@ -48,14 +48,6 @@ const REGION_QUERIES: Record<Region, string[]> = {
   ],
 };
 
-const REGION_SCOPES: Record<Region, Region[]> = {
-  asia: ["asia"],
-  europe: ["europe"],
-  africa: ["africa"],
-  americas: ["americas"],
-  oceania: ["oceania"],
-};
-
 const REPUTABLE_HOSTS = [
   "opec.org",
   "iea.org",
@@ -175,12 +167,12 @@ function normalizeFactor(raw: unknown, scope: "global" | Region, region: Region 
     magnitude,
     source: sourceUrl,
     bias,
-    drift:
+drift:
       f.drift && typeof f.drift === "object"
         ? {
-            ...(typeof f.drift.oil === "number" && Number.isFinite(f.drift.oil) ? { oil: f.drift.oil } : {}),
-            ...(typeof f.drift.electricity === "number" && Number.isFinite(f.drift.electricity) ? { electricity: f.drift.electricity } : {}),
-            ...(typeof f.drift.water === "number" && Number.isFinite(f.drift.water) ? { water: f.drift.water } : {}),
+            ...(typeof (f.drift as Record<string, unknown>).oil === "number" && Number.isFinite((f.drift as Record<string, unknown>).oil) ? { oil: (f.drift as Record<string, unknown>).oil } : {}),
+            ...(typeof (f.drift as Record<string, unknown>).electricity === "number" && Number.isFinite((f.drift as Record<string, unknown>).electricity) ? { electricity: (f.drift as Record<string, unknown>).electricity } : {}),
+            ...(typeof (f.drift as Record<string, unknown>).water === "number" && Number.isFinite((f.drift as Record<string, unknown>).water) ? { water: (f.drift as Record<string, unknown>).water } : {}),
           }
         : {},
     regions: [...new Set(regions)] as Factor["regions"],
@@ -258,7 +250,7 @@ async function runFactorAnalysis(scope: "global" | Region, region: Region | null
   if (current) return current;
   const analytics = scope === "global" ? getGlobalAnalytics() : getRegionalAnalytics(region!);
   const existing = current ?? buildFallbackFactors(scope, region);
-  const searchQuery = (REGION_QUERIES[region ?? "global"] ?? GLOBAL_QUERIES)[0];
+  const searchQuery = (REGION_QUERIES[region ?? "asia"] ?? GLOBAL_QUERIES)[0];
   const search = await tinyfishRouter.tinyfishSearch(`${searchQuery} ${RECENT_MONTH()}`, { limit: 10, region: region ?? undefined });
   const candidates = search.results
     .map((r) => ({ ...r, snippet: typeof r.snippet === "string" ? r.snippet : "" }))

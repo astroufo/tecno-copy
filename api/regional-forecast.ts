@@ -2,7 +2,7 @@ import { kiloRouter } from "./_shared/kiloRouter";
 import { tinyfishRouter } from "./_shared/tinyfishRouter";
 import { REGION_NAMES, type Region } from "./_shared/regions";
 import { getRegionalAnalytics } from "./_shared/deterministicAnalytics";
-import { FORECAST_CACHE_MS, SEARCH_CACHE_MS, sanitizeUrl } from "./_shared/http";
+import { FORECAST_CACHE_MS, sanitizeUrl } from "./_shared/http";
 import { getCache, setCache } from "./_shared/cache";
 import { safeParseJson } from "./_shared/validation";
 import type { RegionalForecastPoint } from "./_shared/types";
@@ -29,13 +29,13 @@ function buildRegionalForecastFallback(region: Region): RegionalForecastPoint[] 
 }
 
 export default async function handler(req: Request): Promise<Response> {
+  const url = new URL(req.url);
+  const regionParam = url.searchParams.get("region");
+  if (!regionParam || !["asia", "europe", "africa", "americas", "oceania"].includes(regionParam)) {
+    return Response.json({ error: "Missing or invalid 'region' query parameter" }, { status: 400 });
+  }
+  const region = regionParam as Region;
   try {
-    const url = new URL(req.url);
-    const regionParam = url.searchParams.get("region");
-    if (!regionParam || !["asia", "europe", "africa", "americas", "oceania"].includes(regionParam)) {
-      return Response.json({ error: "Missing or invalid 'region' query parameter" }, { status: 400 });
-    }
-    const region = regionParam as Region;
     const forceRefresh = url.searchParams.get("force") === "true";
     const cacheKey = `regional-forecast:${region}`;
     const cached = forceRefresh ? null : getCache<RegionalForecastPoint[]>(cacheKey, FORECAST_CACHE_MS);
@@ -77,7 +77,7 @@ export default async function handler(req: Request): Promise<Response> {
       temperature: 0.3,
     };
 
-    let response: Response;
+    let response;
     try {
       response = await kiloRouter.kiloInfer(payload);
     } catch {

@@ -1,16 +1,13 @@
 import crypto from "crypto";
 import {
-  KILO_GATEWAY_BASE_URL,
   KILO_GATEWAY_MODELS_URL,
   KILO_GATEWAY_CHAT_URL,
   DEFAULT_KILO_MODEL_ID,
   KILO_KEY_ENV_NAMES,
   ACCESS_PROBE_CACHE_MS,
   MODEL_CACHE_MS,
-  GLOBAL_RATE_LIMIT_BACKOFF_MS,
   readConfiguredKeys,
   isGlobalRateLimitStatus,
-  isAccessDeniedStatus,
 } from "./http";
 import { getCache, setCache } from "./cache";
 import { KiloResponse, KiloStatus } from "./types";
@@ -73,7 +70,7 @@ export class KiloRouter {
     if (this.initialized) return;
 
     const keys = readConfiguredKeys(KILO_KEY_ENV_NAMES);
-    this.keyStates = keys.map((key, index) => ({
+    this.keyStates = keys.map((_key, index) => ({
       keyIndex: index,
       endpointUrl: KILO_GATEWAY_CHAT_URL,
       inputPrice: null,
@@ -97,8 +94,8 @@ export class KiloRouter {
         const probe = await this.probeKeyModel(keyState, modelCandidate);
         if (probe.success) {
           keyState.available = true;
-          keyState.inputPrice = probe.inputPrice;
-          keyState.outputPrice = probe.outputPrice;
+          keyState.inputPrice = probe.inputPrice ?? null;
+          keyState.outputPrice = probe.outputPrice ?? null;
           keyState.zeroCostVerified = true;
           keyState.lastCheckedAt = new Date().toISOString();
           keyState.lastSuccessAt = keyState.lastCheckedAt;
@@ -381,11 +378,11 @@ export class KiloRouter {
 
     const keys = this.keyStates
       .filter(k => k.available && !k.rateLimited)
-      .map((k, i) => i);
+      .map((_k, i) => i);
 
     const models = this.modelCandidates
       .filter(m => m.zeroCostVerified && m.available && !m.rateLimited)
-      .map((m, i) => i);
+      .map((_m, i) => i);
 
     if (keys.length === 0 || models.length === 0) {
       throw new Error("No available Kilo Gateway key/model combinations");
