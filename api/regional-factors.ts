@@ -155,9 +155,9 @@ function normalizeFactor(raw: unknown, scope: Region, region: Region): Factor | 
 drift:
       f.drift && typeof f.drift === "object"
         ? {
-            ...(typeof (f.drift as Record<string, unknown>).oil === "number" && Number.isFinite((f.drift as Record<string, unknown>).oil) ? { oil: (f.drift as Record<string, unknown>).oil } : {}),
-            ...(typeof (f.drift as Record<string, unknown>).electricity === "number" && Number.isFinite((f.drift as Record<string, unknown>).electricity) ? { electricity: (f.drift as Record<string, unknown>).electricity } : {}),
-            ...(typeof (f.drift as Record<string, unknown>).water === "number" && Number.isFinite((f.drift as Record<string, unknown>).water) ? { water: (f.drift as Record<string, unknown>).water } : {}),
+            ...(typeof (f.drift as Record<string, unknown>).oil === "number" && Number.isFinite((f.drift as Record<string, unknown>).oil) ? { oil: (f.drift as Record<string, unknown>).oil as number } : {}),
+            ...(typeof (f.drift as Record<string, unknown>).electricity === "number" && Number.isFinite((f.drift as Record<string, unknown>).electricity) ? { electricity: (f.drift as Record<string, unknown>).electricity as number } : {}),
+            ...(typeof (f.drift as Record<string, unknown>).water === "number" && Number.isFinite((f.drift as Record<string, unknown>).water) ? { water: (f.drift as Record<string, unknown>).water as number } : {}),
           }
         : {},
     regions: [...new Set(regions)] as Factor["regions"],

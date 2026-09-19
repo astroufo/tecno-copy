@@ -86,8 +86,7 @@ export default async function handler(req: Request): Promise<Response> {
       return Response.json(fallback, { status: 200 });
     }
 
-    const data = await response.json();
-    const content = data?.choices?.[0]?.message?.content ?? "";
+    const content = response.choices?.[0]?.message?.content ?? "";
     const parsed = safeParseJson<Array<unknown>>(content);
 
     if (!parsed) {

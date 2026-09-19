@@ -1,11 +1,11 @@
 import { kiloRouter } from "./_shared/kiloRouter";
 import { tinyfishRouter } from "./_shared/tinyfishRouter";
-import { REGION_NAMES, type Region } from "./_shared/regions";
+import { REGION_NAMES, type Region, isRegion } from "./_shared/regions";
 import { getGlobalAnalytics, getRegionalAnalytics } from "./_shared/deterministicAnalytics";
 import { FACTORS_CACHE_MS, sanitizeUrl } from "./_shared/http";
 import { getCache, setCache } from "./_shared/cache";
 import { safeParseJson, sanitizeError } from "./_shared/validation";
-import type { Factor } from "./_shared/types";
+import type { Factor, CommodityId } from "./_shared/types";
 
 const MAX_FACTORS = 8;
 const SYSTEM_PROMPT_GLOBAL =
@@ -170,9 +170,9 @@ function normalizeFactor(raw: unknown, scope: "global" | Region, region: Region 
 drift:
       f.drift && typeof f.drift === "object"
         ? {
-            ...(typeof (f.drift as Record<string, unknown>).oil === "number" && Number.isFinite((f.drift as Record<string, unknown>).oil) ? { oil: (f.drift as Record<string, unknown>).oil } : {}),
-            ...(typeof (f.drift as Record<string, unknown>).electricity === "number" && Number.isFinite((f.drift as Record<string, unknown>).electricity) ? { electricity: (f.drift as Record<string, unknown>).electricity } : {}),
-            ...(typeof (f.drift as Record<string, unknown>).water === "number" && Number.isFinite((f.drift as Record<string, unknown>).water) ? { water: (f.drift as Record<string, unknown>).water } : {}),
+            ...(typeof (f.drift as Record<string, unknown>).oil === "number" && Number.isFinite((f.drift as Record<string, unknown>).oil) ? { oil: (f.drift as Record<string, unknown>).oil as number } : {}),
+            ...(typeof (f.drift as Record<string, unknown>).electricity === "number" && Number.isFinite((f.drift as Record<string, unknown>).electricity) ? { electricity: (f.drift as Record<string, unknown>).electricity as number } : {}),
+            ...(typeof (f.drift as Record<string, unknown>).water === "number" && Number.isFinite((f.drift as Record<string, unknown>).water) ? { water: (f.drift as Record<string, unknown>).water as number } : {}),
           }
         : {},
     regions: [...new Set(regions)] as Factor["regions"],
@@ -223,14 +223,14 @@ function buildFallbackFactors(scope: "global" | Region, region: Region | null): 
     americas: ["US Shale Productivity", "Henry Hub Gas to Power", "LatAm Hydrology & Drought", "Pipeline & Export Capacity", "California Water Stress", "Grid Resilience Investment", "EV Adoption & Battery Storage", "LNG Export Growth"],
     oceania: ["LNG Export Linkage", "NEM & NZ Wholesale Spikes", "Millennium Drought Legacy", "Remote Island Fuel Premiums", "Desalination & Reuse", "Renewable Energy Zones", "Coal Plant Retirements", "Urban Water Tariff Reform"],
   };
-  const source = scope === "global" ? "Public market benchmarks (EIA, IEA, OPEC, UN-Water)" : `${REGION_NAMES[region ?? "global"]} regional energy authorities and public benchmarks`;
+  const source = scope === "global" ? "Public market benchmarks (EIA, IEA, OPEC, UN-Water)" : `${REGION_NAMES[(region ?? "asia") as Region]} regional energy authorities and public benchmarks`;
   const commodities: Factor["commodities"] = ["oil", "electricity", "water"];
   return names[scope].slice(0, MAX_FACTORS).map((name, i) => ({
     id: `fallback-${scope}-${i + 1}`,
     name,
     category: i % 3 === 0 ? "Policy" : i % 3 === 1 ? "Market" : "Structural",
     commodities,
-    explanation: `Static ${scope === "global" ? "global" : REGION_NAMES[region ?? "global"]} fallback factor maintained when live AI curation is unavailable.`,
+    explanation: `Static ${scope === "global" ? "global" : REGION_NAMES[(region ?? "asia") as Region]} fallback factor maintained when live AI curation is unavailable.`,
     direction: i % 3 === 2 ? "mixed" : i % 2 === 0 ? "up" : "down",
     magnitude: (["High", "Medium", "Low"] as const)[i % 3],
     source,
@@ -245,7 +245,6 @@ function buildFallbackFactors(scope: "global" | Region, region: Region | null): 
 }
 
 async function runFactorAnalysis(scope: "global" | Region, region: Region | null): Promise<Factor[]> {
-  const now = new Date().toISOString();
   const current = getCache<Factor[]>(`dynamic-factors:${scope}`, FACTORS_CACHE_MS);
   if (current) return current;
   const analytics = scope === "global" ? getGlobalAnalytics() : getRegionalAnalytics(region!);
@@ -272,7 +271,7 @@ async function runFactorAnalysis(scope: "global" | Region, region: Region | null
   const prompt =
     scope === "global"
       ? SYSTEM_PROMPT_GLOBAL
-      : SYSTEM_PROMPT_REGIONAL(REGION_NAMES[region ?? "global"]);
+      : SYSTEM_PROMPT_REGIONAL(REGION_NAMES[(region ?? "asia") as Region]);
   const payload = {
     messages: [
       { role: "system", content: prompt },
@@ -281,7 +280,7 @@ async function runFactorAnalysis(scope: "global" | Region, region: Region | null
         content: JSON.stringify({
           analytics,
           existingFactors: existing,
-          candidates: excerpts.map((c) => ({ title: c.title, source: c.url, snippet: c.snippet?.slice(0, 2500), text: c.text?.slice(0, 8000) })),
+          candidates: excerpts.map((c) => ({ title: c.title, source: c.url, snippet: c.snippet?.slice(0, 2500), text: (c as any).text?.slice(0, 8000) })),
           region: region ?? null,
           month: RECENT_MONTH(),
         }),
@@ -319,7 +318,7 @@ export default async function handler(req: Request): Promise<Response> {
         return Response.json({ factors: cached, scope, count: cached.length, aiCurated: true, cacheKey, updatedAt: new Date().toISOString() }, { status: 200 });
       }
     }
-    const factors = await runFactorAnalysis(scope, isGlobal ? null : scope);
+    const factors = await runFactorAnalysis(scope, isGlobal ? null : scope as Region);
     setCache(cacheKey, factors, FACTORS_CACHE_MS);
     return Response.json({ factors, scope, count: factors.length, aiCurated: true, cacheKey, updatedAt: new Date().toISOString() }, { status: 200 });
   } catch (error) {

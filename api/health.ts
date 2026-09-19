@@ -1,4 +1,3 @@
-import { getCache, setCache } from "./_shared/cache";
 import { REGION_NAMES, type Region } from "./_shared/regions";
 import { getGlobalAnalytics, getRegionalAnalytics } from "./_shared/deterministicAnalytics";
 import { kiloRouter } from "./_shared/kiloRouter";
@@ -56,7 +55,7 @@ interface HealthResponse {
   };
 }
 
-export default async function handler(req: any, res: any): Promise<void> {
+export default async function handler(_req: any, res: any): Promise<void> {
   try {
     const kiloStatus = await kiloRouter.getKiloStatus();
     const tinyfishStatus = await tinyfishRouter.getTinyfishStatus();
