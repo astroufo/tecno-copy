@@ -32,10 +32,10 @@ export default function App() {
   } = useLiveMarket();
 
   const [healthStatus, setHealthStatus] = useState<"Initializing AI" | "Online Model Connected" | "Offline Model">("Initializing AI");
-  const [onlineModelConnected, setOnlineModelConnected] = useState(false);
+  const [_onlineModelConnected, setOnlineModelConnected] = useState(false);
   const [globalFactors, setGlobalFactors] = useState<Factor[]>(FACTORS);
   const [regionalFactors, setRegionalFactors] = useState<Record<string, Factor[]>>({});
-  const [regionalAnalytics, setRegionalAnalytics] = useState<Record<string, unknown>>({});
+  const [_regionalAnalytics, setRegionalAnalytics] = useState<Record<string, unknown>>({});
 
   const points = useMemo(
     () => generateForecast(prices, horizon, jitter, region),
