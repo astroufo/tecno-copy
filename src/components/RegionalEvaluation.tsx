@@ -33,6 +33,7 @@ import {
   type CommodityId,
   type RegionEvaluation,
   type RegionId,
+  type Factor,
 } from "../lib/model";
 
 Chart.register(BarController, BarElement, CategoryScale, Legend, LinearScale, Tooltip);
@@ -191,12 +192,98 @@ function RegionCard({
   );
 }
 
+function isNewFactor(createdAt: string): boolean {
+  const created = new Date(createdAt);
+  const now = new Date();
+  const diffMs = now.getTime() - created.getTime();
+  return diffMs <= 10 * 60 * 1000;
+}
+
+function RegionalFactorCard({
+  factor,
+  index,
+}: {
+  factor: Factor;
+  index: number;
+}) {
+  const isNew = isNewFactor(factor.createdAt);
+
+  return (
+    <article className="group relative flex flex-col overflow-hidden rounded-2xl border border-line bg-panel/60 p-4 transition-all duration-300 hover:border-line-strong hover:bg-panel">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="rounded-full border border-line bg-base/50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-slate-500">
+              {factor.category}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-semibold text-amber-300 border-amber-400/30 bg-amber-400/10">
+              {factor.magnitude}
+            </span>
+          </div>
+          <h4 className="mt-2 font-display text-sm font-semibold text-white leading-snug">
+            {factor.name}
+            {isNew && (
+              <span className="ml-1.5 inline-flex items-center rounded-full bg-teal-500 px-1.5 py-0.5 text-[9px] font-semibold text-white">
+                New
+              </span>
+            )}
+          </h4>
+        </div>
+        <span className="shrink-0 font-display text-[11px] font-bold text-slate-600">
+          {String(index + 1).padStart(2, "0")}
+        </span>
+      </div>
+
+      <p className="mt-2 text-[11px] leading-relaxed text-slate-400 line-clamp-3">
+        {factor.explanation}
+      </p>
+
+      <div className="mt-2 flex flex-wrap gap-1">
+        {factor.commodities.map((id) => {
+          const c = COMMODITIES.find((x) => x.id === id)!;
+          return (
+            <span
+              key={id}
+              className="rounded-full px-1.5 py-0.5 text-[9px] font-semibold"
+              style={{ color: c.color, background: `${c.color}18` }}
+            >
+              {c.short}
+            </span>
+          );
+        })}
+        {factor.regions
+          ?.filter((r) => r !== "global")
+          .slice(0, 2)
+          .map((r) => (
+            <span
+              key={r}
+              className="rounded-full border border-line bg-base/40 px-1.5 py-0.5 text-[9px] font-medium capitalize text-slate-500"
+            >
+              {r}
+            </span>
+          ))}
+      </div>
+
+      <div className="mt-2 flex items-center justify-between text-[10px]">
+        <span className="font-semibold text-teal-300">Impact: {factor.importanceScore}/100</span>
+        <span className="font-semibold text-slate-500 capitalize">
+          {factor.direction} · {factor.bias}
+        </span>
+      </div>
+
+      <p className="mt-1 text-[9px] text-slate-600 line-clamp-1">Source: {factor.source}</p>
+    </article>
+  );
+}
+
 interface RegionalEvaluationProps {
   prices: Record<CommodityId, number>;
   horizon: number;
   jitter: number;
   region: RegionId;
   onRegion: (r: RegionId) => void;
+  dynamicFactors: Record<string, Factor[]>;
+  healthStatus: "Initializing AI" | "Online Model Connected" | "Offline Model";
 }
 
 export default function RegionalEvaluation({
@@ -205,6 +292,8 @@ export default function RegionalEvaluation({
   jitter,
   region,
   onRegion,
+  dynamicFactors,
+  healthStatus,
 }: RegionalEvaluationProps) {
   const evals = useMemo(
     () => evaluateRegions(prices, horizon, jitter),
@@ -542,6 +631,25 @@ export default function RegionalEvaluation({
                     </li>
                   ))}
                 </ul>
+              </div>
+
+              {/* AI-curated regional factors */}
+              <div className="mt-5">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    {healthStatus === "Online Model Connected"
+                      ? "AI Factors"
+                      : "Regional factors"}
+                  </p>
+                  <span className="text-[11px] text-slate-600">
+                    8 factors per region
+                  </span>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {(dynamicFactors[selected.region.id] ?? []).map((f, i) => (
+                    <RegionalFactorCard key={f.id} factor={f} index={i} />
+                  ))}
+                </div>
               </div>
 
               <button
