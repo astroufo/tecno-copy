@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+coverage/
+.nyc_output
+tmp/
+temp/
+.vscode/
+.idea/
+.vercel

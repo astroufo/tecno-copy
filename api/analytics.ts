@@ -1,5 +1,5 @@
-import { getGlobalAnalytics, clearAnalyticsCache } from "./_shared/deterministicAnalytics";
-import { ANALYTICS_CACHE_MS } from "./_shared/http";
+import { getGlobalAnalytics, clearAnalyticsCache } from "./_shared/deterministicAnalytics.js";
+import { ANALYTICS_CACHE_MS } from "./_shared/http.js";
 
 export default function handler(req: any, res: any): void {
   try {

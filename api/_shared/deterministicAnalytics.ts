@@ -1,12 +1,12 @@
-import { getCache, setCache } from "./cache";
+import { getCache, setCache } from "./cache.js";
 import {
   ANALYTICS_CACHE_MS,
   clamp,
   parsePositiveNumber,
   round,
-} from "./http";
-import { REGION_NAMES, type Region } from "./regions";
-import type { AnalyticsSnapshot, RegionalAnalyticsSnapshot } from "./types";
+} from "./http.js";
+import { REGION_NAMES, type Region } from "./regions.js";
+import type { AnalyticsSnapshot, RegionalAnalyticsSnapshot } from "./types.js";
 
 export interface PriceInput {
   currentDieselPrice: number;

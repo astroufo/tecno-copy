@@ -1,7 +1,7 @@
-import { REGION_NAMES, type Region } from "./_shared/regions";
-import { getGlobalAnalytics, getRegionalAnalytics } from "./_shared/deterministicAnalytics";
-import { kiloRouter } from "./_shared/kiloRouter";
-import { tinyfishRouter } from "./_shared/tinyfishRouter";
+import { REGION_NAMES, type Region } from "./_shared/regions.js";
+import { getGlobalAnalytics, getRegionalAnalytics } from "./_shared/deterministicAnalytics.js";
+import { kiloRouter } from "./_shared/kiloRouter.js";
+import { tinyfishRouter } from "./_shared/tinyfishRouter.js";
 
 interface HealthResponse {
   kiloGateway: {

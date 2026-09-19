@@ -1,6 +1,6 @@
-import { getRegionalAnalytics, clearAnalyticsCache } from "./_shared/deterministicAnalytics";
-import { ANALYTICS_CACHE_MS } from "./_shared/http";
-import { isRegion, type Region } from "./_shared/regions";
+import { getRegionalAnalytics, clearAnalyticsCache } from "./_shared/deterministicAnalytics.js";
+import { ANALYTICS_CACHE_MS } from "./_shared/http.js";
+import { isRegion, type Region } from "./_shared/regions.js";
 
 export default function handler(req: Request): Response {
   try {

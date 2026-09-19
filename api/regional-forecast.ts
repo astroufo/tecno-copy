@@ -1,11 +1,11 @@
-import { kiloRouter } from "./_shared/kiloRouter";
-import { tinyfishRouter } from "./_shared/tinyfishRouter";
-import { REGION_NAMES, type Region } from "./_shared/regions";
-import { getRegionalAnalytics } from "./_shared/deterministicAnalytics";
-import { FORECAST_CACHE_MS, sanitizeUrl } from "./_shared/http";
-import { getCache, setCache } from "./_shared/cache";
-import { safeParseJson } from "./_shared/validation";
-import type { RegionalForecastPoint } from "./_shared/types";
+import { kiloRouter } from "./_shared/kiloRouter.js";
+import { tinyfishRouter } from "./_shared/tinyfishRouter.js";
+import { REGION_NAMES, type Region } from "./_shared/regions.js";
+import { getRegionalAnalytics } from "./_shared/deterministicAnalytics.js";
+import { FORECAST_CACHE_MS, sanitizeUrl } from "./_shared/http.js";
+import { getCache, setCache } from "./_shared/cache.js";
+import { safeParseJson } from "./_shared/validation.js";
+import type { RegionalForecastPoint } from "./_shared/types.js";
 
 const START_YEAR = new Date().getFullYear();
 

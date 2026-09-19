@@ -1,9 +1,9 @@
 import {
   TINYFISH_KEY_ENV_NAMES,
   readConfiguredKeys,
-} from "./http";
-import { getCache, setCache } from "./cache";
-import type { Region } from "./regions";
+} from "./http.js";
+import { getCache, setCache } from "./cache.js";
+import type { Region } from "./regions.js";
 
 export interface TinyFishKeyState {
   keyIndex: number;
