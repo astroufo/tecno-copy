@@ -43,7 +43,7 @@ export class TinyFishRouter {
     if (!force && this.initialized && this.keyStates.length > 0) return;
 
     const keys = readConfiguredKeys(TINYFISH_KEY_ENV_NAMES);
-    this.keyStates = keys.map((key, index) => ({
+    this.keyStates = keys.map((_key, index) => ({
       keyIndex: index,
       available: false, // Will be verified on first use
       rateLimited: false,

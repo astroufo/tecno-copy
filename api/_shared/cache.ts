@@ -3,8 +3,8 @@ export interface CacheEntry<T> {
   expiresAt: number;
 }
 
-export function getCache<T>(key: string, ttlMs: number): T | null {
-  const entry = globalThis.__cache as Map<string, CacheEntry<T>> | undefined;
+export function getCache<T>(key: string, _ttlMs: number): T | null {
+  const entry = (globalThis as Record<string, unknown>).__cache as Map<string, CacheEntry<T>> | undefined;
   if (!entry) return null;
   const cached = entry.get(key);
   if (!cached) return null;
@@ -16,7 +16,7 @@ export function getCache<T>(key: string, ttlMs: number): T | null {
 }
 
 export function setCache<T>(key: string, data: T, ttlMs: number): void {
-  let entry = globalThis.__cache as Map<string, CacheEntry<T>> | undefined;
+  let entry = (globalThis as Record<string, unknown>).__cache as Map<string, CacheEntry<T>> | undefined;
   if (!entry) {
     entry = new Map();
     (globalThis as Record<string, unknown>).__cache = entry;
@@ -25,7 +25,7 @@ export function setCache<T>(key: string, data: T, ttlMs: number): void {
 }
 
 export function deleteCache(key: string): void {
-  const entry = globalThis.__cache as Map<string, CacheEntry<unknown>> | undefined;
+  const entry = (globalThis as Record<string, unknown>).__cache as Map<string, CacheEntry<unknown>> | undefined;
   entry?.delete(key);
 }
 

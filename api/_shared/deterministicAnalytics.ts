@@ -125,32 +125,32 @@ export function getGlobalAnalytics(): AnalyticsSnapshot {
 }
 
 export function getRegionalAnalytics(region: Region): RegionalAnalyticsSnapshot {
-  const cached = getCache<RegionalAnalyticsSnapshot>(`analytics:regional:${region}`, ANALYTICS_CACHE_MS);
-  if (cached) return cached;
+    const cached = getCache<RegionalAnalyticsSnapshot>(`analytics:regional:${region}`, ANALYTICS_CACHE_MS);
+    if (cached) return cached;
 
-  const config = readConfig();
-  const defaults = REGIONAL_DEFAULTS[region];
-  const result = computeAnalytics(
-    {
-      currentDieselPrice: defaults.diesel.current,
-      baselineDieselPrice: defaults.diesel.baseline,
-      currentElectricityTariff: defaults.electricity.current,
-      baselineElectricityTariff: defaults.electricity.baseline,
-      currentWaterPrice: defaults.water.current,
-      baselineWaterPrice: defaults.water.baseline,
-    },
-    config,
-    `${REGION_NAMES[region]} regional retail fuel, electricity and water benchmark (public composite)`,
-    false,
-    region,
-  );
-  setCache(`analytics:regional:${region}`, result, ANALYTICS_CACHE_MS);
-  return result;
+    const config = readConfig();
+    const defaults = REGIONAL_DEFAULTS[region];
+    const result = computeAnalytics(
+        {
+            currentDieselPrice: defaults.diesel.current,
+            baselineDieselPrice: defaults.diesel.baseline,
+            currentElectricityTariff: defaults.electricity.current,
+            baselineElectricityTariff: defaults.electricity.baseline,
+            currentWaterPrice: defaults.water.current,
+            baselineWaterPrice: defaults.water.baseline,
+        },
+        config,
+        `${REGION_NAMES[region]} regional retail fuel, electricity and water benchmark (public composite)`,
+        false,
+        region,
+    );
+    setCache(`analytics:regional:${region}`, result, ANALYTICS_CACHE_MS);
+    return result as RegionalAnalyticsSnapshot;
 }
 
 export function clearAnalyticsCache(): void {
-  ["analytics:global", ...Object.keys(REGION_NAMES).map((r) => `analytics:regional:${r}`)].forEach((key) => {
-    const entry = globalThis.__cache as Map<string, { expiresAt: number }> | undefined;
-    entry?.delete(key);
-  });
+    ["analytics:global", ...Object.keys(REGION_NAMES).map((r) => `analytics:regional:${r}`)].forEach((key) => {
+        const entry = (globalThis as Record<string, unknown>).__cache as Map<string, { expiresAt: number }> | undefined;
+        entry?.delete(key);
+    });
 }
