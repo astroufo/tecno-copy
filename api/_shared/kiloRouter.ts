@@ -22,6 +22,7 @@ function makeId(prefix = "chatcmpl"): string {
 
 export interface KiloKeyState {
   keyIndex: number;
+  envName: string;
   endpointUrl: string;
   inputPrice: number | null;
   outputPrice: number | null;
@@ -71,8 +72,9 @@ export class KiloRouter {
     if (this.initialized) return;
 
     const keys = readConfiguredKeys(KILO_KEY_ENV_NAMES);
-    this.keyStates = keys.map((_key, index) => ({
+    this.keyStates = keys.map((key, index) => ({
       keyIndex: index,
+      envName: key.envName,
       endpointUrl: KILO_GATEWAY_CHAT_URL,
       inputPrice: null,
       outputPrice: null,
@@ -219,7 +221,7 @@ export class KiloRouter {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env[`KILO_GATEWAY_KEY_${keyState.keyIndex + 1}`] ?? ""}`,
+          Authorization: `Bearer ${process.env[keyState.envName] ?? ""}`,
         },
         body: JSON.stringify({
           model: modelCandidate.modelId,
@@ -405,7 +407,7 @@ export class KiloRouter {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${process.env[`KILO_GATEWAY_KEY_${keyIndex + 1}`] ?? ""}`,
+              Authorization: `Bearer ${process.env[keyState.envName] ?? ""}`,
             },
             body: JSON.stringify({
               model: modelCandidate.modelId,

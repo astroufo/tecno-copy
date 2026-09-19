@@ -7,6 +7,7 @@ import type { Region } from "./regions";
 
 export interface TinyFishKeyState {
   keyIndex: number;
+  envName: string;
   available: boolean;
   rateLimited: boolean;
   rateLimitRemaining: number | null;
@@ -43,8 +44,9 @@ export class TinyFishRouter {
     if (!force && this.initialized && this.keyStates.length > 0) return;
 
     const keys = readConfiguredKeys(TINYFISH_KEY_ENV_NAMES);
-    this.keyStates = keys.map((_key, index) => ({
+    this.keyStates = keys.map((key, index) => ({
       keyIndex: index,
+      envName: key.envName,
       available: false, // Will be verified on first use
       rateLimited: false,
       rateLimitRemaining: null,
@@ -56,7 +58,7 @@ export class TinyFishRouter {
     // Try to verify each key with a lightweight request
     for (const keyState of this.keyStates) {
       try {
-        const testKey = process.env[TINYFISH_KEY_ENV_NAMES[keyState.keyIndex]];
+        const testKey = process.env[keyState.envName];
         if (!testKey) continue;
 
         const response = await fetch("https://api.tinyfish.ai/api/search", {
@@ -163,7 +165,7 @@ export class TinyFishRouter {
       }
 
       try {
-        const testKey = process.env[TINYFISH_KEY_ENV_NAMES[keyState.keyIndex]];
+        const testKey = process.env[keyState.envName];
         if (!testKey) {
           keyState = this.rotateKey(keyState);
           continue;
@@ -269,7 +271,7 @@ export class TinyFishRouter {
       }
 
       try {
-        const testKey = process.env[TINYFISH_KEY_ENV_NAMES[keyState.keyIndex]];
+        const testKey = process.env[keyState.envName];
         if (!testKey) {
           keyState = this.rotateKey(keyState);
           continue;
