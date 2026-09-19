@@ -423,9 +423,9 @@ export class KiloRouter {
 
           if (status === 200) {
             const data = await response.json();
-            const result: KiloResponse = {
-              id: data.id ?? `chatcmpl-${nanoid()}`,
-              object: data.object ?? "chat.completion",
+const result: KiloResponse = {
+               id: data.id ?? makeId(),
+               object: data.object ?? "chat.completion",
               created: data.created ?? Math.floor(Date.now() / 1000),
               model: data.model ?? modelCandidate.modelId,
               choices: Array.isArray(data.choices) && data.choices.length > 0
