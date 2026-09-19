@@ -17,9 +17,11 @@ export interface TinyFishKeyState {
 }
 
 interface SearchResult {
+  position: number;
+  site_name: string;
   title: string;
-  url: string;
   snippet: string;
+  url: string;
   publishedAt?: string;
 }
 
@@ -34,6 +36,14 @@ interface ScrapedContent {
   title: string;
   text: string;
   keyIndex: number;
+}
+
+const SEARCH_URL = "https://api.search.tinyfish.ai";
+const FETCH_URL = "https://api.fetch.tinyfish.ai";
+
+function buildSearchUrl(query: string, limit: number): string {
+  const params = new URLSearchParams({ query, limit: String(limit) });
+  return `${SEARCH_URL}?${params.toString()}`;
 }
 
 export class TinyFishRouter {
@@ -55,21 +65,15 @@ export class TinyFishRouter {
       lastSuccessAt: null,
     }));
 
-    // Try to verify each key with a lightweight request
     for (const keyState of this.keyStates) {
       try {
         const testKey = process.env[keyState.envName];
         if (!testKey) continue;
 
-        const response = await fetch("https://api.tinyfish.ai/api/search", {
+        const response = await fetch(buildSearchUrl("test", 1), {
           headers: {
-            Authorization: `Bearer ${testKey}`,
-            "Content-Type": "application/json",
+            "X-API-Key": testKey,
           },
-          body: JSON.stringify({
-            query: "test",
-            limit: 1,
-          }),
           signal: AbortSignal.timeout(10000),
         });
 
@@ -124,7 +128,6 @@ export class TinyFishRouter {
 
     if (available.length === 0) return null;
 
-    // Prefer key with highest remaining quota, then round-robin
     const maxRemaining = Math.max(
       ...available.map(k => k.rateLimitRemaining ?? 0)
     );
@@ -158,7 +161,6 @@ export class TinyFishRouter {
 
     for (let attempt = 0; attempt < 3; attempt++) {
       if (!keyState) {
-        // All keys exhausted, wait and retry
         await this.backoff(attempt);
         keyState = this.selectKey();
         if (!keyState) break;
@@ -174,16 +176,10 @@ export class TinyFishRouter {
         const region = options.region ?? "global";
         const regionPrefix = region !== "global" ? `[${region}] ` : "";
 
-        const response = await fetch("https://api.tinyfish.ai/api/search", {
-          method: "POST",
+        const response = await fetch(buildSearchUrl(`${regionPrefix}${query}`, options.limit ?? 10), {
           headers: {
-            Authorization: `Bearer ${testKey}`,
-            "Content-Type": "application/json",
+            "X-API-Key": testKey,
           },
-          body: JSON.stringify({
-            query: `${regionPrefix}${query}`,
-            limit: options.limit ?? 10,
-          }),
           signal: AbortSignal.timeout(30000),
         });
 
@@ -191,16 +187,19 @@ export class TinyFishRouter {
 
         if (status === 200) {
           const data = await response.json();
+          const results: SearchResult[] = Array.isArray(data.results)
+            ? data.results.map((r: any) => ({
+                position: r.position ?? 0,
+                site_name: r.site_name ?? "",
+                title: r.title ?? "",
+                snippet: r.snippet ?? "",
+                url: r.url ?? "",
+                publishedAt: r.published_at ?? undefined,
+              }))
+            : [];
           const result: TinyFishSearchResponse = {
-            results: Array.isArray(data.results)
-              ? data.results.map((r: any) => ({
-                  title: r.title ?? "",
-                  url: r.url ?? "",
-                  snippet: r.snippet ?? "",
-                  publishedAt: r.published_at,
-                }))
-              : [],
-            total: data.total ?? 0,
+            results,
+            total: data.total_results ?? 0,
             keyIndex: keyState.keyIndex,
           };
 
@@ -238,14 +237,12 @@ export class TinyFishRouter {
       keyState = this.selectKey();
     }
 
-    // Fallback to cached if available
     const cachedFallback = getCache<TinyFishSearchResponse>(
       cacheKey,
       60 * 60 * 1000
     );
     if (cachedFallback) return cachedFallback;
 
-    // Return empty sanitized result
     console.error("TinyFish search failed:", lastError?.message);
     return { results: [], total: 0, keyIndex: -1 };
   }
@@ -255,7 +252,7 @@ export class TinyFishRouter {
       await this.refreshTinyfishStatus(true);
     }
 
-    const safeUrl = url; // URL validation should happen before calling
+    const safeUrl = url;
     const cacheKey = `tinyfish:scrape:${safeUrl}`;
     const cached = getCache<ScrapedContent>(cacheKey, 10 * 60 * 1000);
     if (cached) return cached;
@@ -277,14 +274,14 @@ export class TinyFishRouter {
           continue;
         }
 
-        const response = await fetch("https://api.tinyfish.ai/api/scrape", {
+        const response = await fetch(FETCH_URL, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${testKey}`,
+            "X-API-Key": testKey,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            url: safeUrl,
+            urls: [safeUrl],
           }),
           signal: AbortSignal.timeout(30000),
         });
@@ -293,10 +290,13 @@ export class TinyFishRouter {
 
         if (status === 200) {
           const data = await response.json();
+          const firstResult = Array.isArray(data.results) && data.results.length > 0
+            ? data.results[0]
+            : null;
           const result: ScrapedContent = {
             url: safeUrl,
-            title: data.title ?? "",
-            text: typeof data.text === "string" ? data.text.slice(0, 10000) : "",
+            title: firstResult?.title ?? "",
+            text: typeof firstResult?.text === "string" ? firstResult.text.slice(0, 10000) : "",
             keyIndex: keyState.keyIndex,
           };
 
