@@ -1,6 +1,6 @@
 import { kiloRouter } from "./_shared/kiloRouter.js";
 import { tinyfishRouter } from "./_shared/tinyfishRouter.js";
-import { REGION_NAMES, type Region } from "./_shared/regions.js";
+import { REGION_NAMES, isRegion, type Region } from "./_shared/regions.js";
 import { getRegionalAnalytics } from "./_shared/deterministicAnalytics.js";
 import { FORECAST_CACHE_MS, sanitizeUrl } from "./_shared/http.js";
 import { getCache, setCache } from "./_shared/cache.js";
@@ -31,14 +31,14 @@ function buildRegionalForecastFallback(region: Region): RegionalForecastPoint[] 
 export default async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const regionParam = url.searchParams.get("region");
-  if (!regionParam || !["asia", "europe", "africa", "americas", "oceania"].includes(regionParam)) {
+  if (!regionParam || !isRegion(regionParam)) {
     return Response.json({ error: "Missing or invalid 'region' query parameter" }, { status: 400 });
   }
   const region = regionParam as Region;
   try {
     const forceRefresh = url.searchParams.get("force") === "true";
     const cacheKey = `regional-forecast:${region}`;
-    const cached = forceRefresh ? null : getCache<RegionalForecastPoint[]>(cacheKey, FORECAST_CACHE_MS);
+    const cached = forceRefresh ? null : await getCache<RegionalForecastPoint[]>(cacheKey, FORECAST_CACHE_MS);
     if (cached) {
       return Response.json(cached, { status: 200 });
     }
@@ -48,14 +48,14 @@ export default async function handler(req: Request): Promise<Response> {
 
     if (!aiEnabled || !kiloStatus.available || kiloStatus.zeroCostModels.length === 0) {
       const fallback = buildRegionalForecastFallback(region);
-      setCache(cacheKey, fallback, FORECAST_CACHE_MS);
+      await setCache(cacheKey, fallback, FORECAST_CACHE_MS);
       return Response.json(fallback, { status: 200 });
     }
 
     const analytics = getRegionalAnalytics(region);
     const search = await tinyfishRouter.tinyfishSearch(`${REGION_NAMES[region]} oil electricity water prices 2026`, { region });
-    const factorsCache = getCache<unknown[]>("dynamic-factors:global", FORECAST_CACHE_MS);
-    const regionalFactorsCache = getCache<unknown[]>(`dynamic-factors:${region}`, FORECAST_CACHE_MS);
+    const factorsCache = await getCache<unknown[]>("dynamic-factors:global", FORECAST_CACHE_MS);
+    const regionalFactorsCache = await getCache<unknown[]>(`dynamic-factors:${region}`, FORECAST_CACHE_MS);
     const factors = regionalFactorsCache ?? factorsCache ?? [];
 
     const payload = {
@@ -82,16 +82,16 @@ export default async function handler(req: Request): Promise<Response> {
       response = await kiloRouter.kiloInfer(payload);
     } catch {
       const fallback = buildRegionalForecastFallback(region);
-      setCache(cacheKey, fallback, FORECAST_CACHE_MS);
+      await setCache(cacheKey, fallback, FORECAST_CACHE_MS);
       return Response.json(fallback, { status: 200 });
     }
 
     const content = response.choices?.[0]?.message?.content ?? "";
-    const parsed = safeParseJson<Array<unknown>>(content);
+    const parsed = safeParseJson<Array<RegionalForecastPoint>>(content);
 
     if (!parsed) {
       const fallback = buildRegionalForecastFallback(region);
-      setCache(cacheKey, fallback, FORECAST_CACHE_MS);
+      await setCache(cacheKey, fallback, FORECAST_CACHE_MS);
       return Response.json(fallback, { status: 200 });
     }
 
@@ -114,15 +114,16 @@ export default async function handler(req: Request): Promise<Response> {
 
     if (validated.length === 0) {
       const fallback = buildRegionalForecastFallback(region);
-      setCache(cacheKey, fallback, FORECAST_CACHE_MS);
+      await setCache(cacheKey, fallback, FORECAST_CACHE_MS);
       return Response.json(fallback, { status: 200 });
     }
 
-    setCache(cacheKey, validated, FORECAST_CACHE_MS);
+    await setCache(cacheKey, validated, FORECAST_CACHE_MS);
     return Response.json(validated, { status: 200 });
   } catch (error) {
     console.error("Regional forecast error:", error);
-    const fallback = buildRegionalForecastFallback(regionParam as Region);
-    return Response.json(fallback, { status: 200 });
+    const region = isRegion(regionParam) ? (regionParam as Region) : "asia";
+    const fallback = buildRegionalForecastFallback(region);
+    return Response.json(fallback, { status: 503 });
   }
 }

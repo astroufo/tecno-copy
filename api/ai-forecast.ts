@@ -3,19 +3,14 @@ import { getGlobalAnalytics } from "./_shared/deterministicAnalytics.js";
 import { FORECAST_CACHE_MS } from "./_shared/http.js";
 import { getCache, setCache } from "./_shared/cache.js";
 import { safeParseJson } from "./_shared/validation.js";
+import type { ForecastPoint } from "./_shared/types.js";
 
 const SYSTEM_PROMPT_GLOBAL =
   "You are a quantitative commodities forecasting system. Use the supplied global analytics snapshot, global dynamic factors, and historical series to produce 1–10 year global forecasts for oil, electricity, and water.\n\nEmulate LSTM-style sequence continuation, Temporal Fusion Transformer-style multi-horizon attention, XGBoost-style feature-importance reasoning, and Bayesian Neural Network-style uncertainty bands.\n\nRespect the current global analytics values as the year-zero anchors. Avoid unrealistic discontinuities unless they are supported by supplied high-importance global factors.\n\nReturn strict JSON only matching the required ForecastPoint[] schema. Do not include markdown or commentary outside JSON.";
 
 const START_YEAR = new Date().getFullYear();
 
-function buildGlobalForecastFallback(): Array<{
-  year: number;
-  label: string;
-  oil: { avg: number; min: number; max: number };
-  electricity: { avg: number; min: number; max: number };
-  water: { avg: number; min: number; max: number };
-}> {
+function buildGlobalForecastFallback(): ForecastPoint[] {
   const points = [];
   for (let t = 0; t <= 10; t++) {
     points.push({
@@ -34,7 +29,7 @@ export default async function handler(req: Request): Promise<Response> {
     const url = new URL(req.url);
     const forceRefresh = url.searchParams.get("force") === "true";
     const cacheKey = "ai-forecast:global";
-    const cached = forceRefresh ? null : getCache(cacheKey, FORECAST_CACHE_MS);
+    const cached = forceRefresh ? null : await getCache(cacheKey, FORECAST_CACHE_MS);
     if (cached) return Response.json(cached, { status: 200 });
 
     const kiloStatus = await kiloRouter.getKiloStatus();
@@ -42,12 +37,12 @@ export default async function handler(req: Request): Promise<Response> {
 
     if (!aiEnabled || !kiloStatus.available || kiloStatus.zeroCostModels.length === 0) {
       const fallback = buildGlobalForecastFallback();
-      setCache(cacheKey, fallback, FORECAST_CACHE_MS);
+      await setCache(cacheKey, fallback, FORECAST_CACHE_MS);
       return Response.json(fallback, { status: 200 });
     }
 
     const analytics = getGlobalAnalytics();
-    const factorsCache = getCache("dynamic-factors:global", FORECAST_CACHE_MS);
+    const factorsCache = await getCache("dynamic-factors:global", FORECAST_CACHE_MS);
     const factors = factorsCache ?? [];
 
     const payload = {
@@ -72,16 +67,16 @@ export default async function handler(req: Request): Promise<Response> {
       kiloResponse = await kiloRouter.kiloInfer(payload);
     } catch {
       const fallback = buildGlobalForecastFallback();
-      setCache(cacheKey, fallback, FORECAST_CACHE_MS);
+      await setCache(cacheKey, fallback, FORECAST_CACHE_MS);
       return Response.json(fallback, { status: 200 });
     }
 
     const content = kiloResponse.choices?.[0]?.message?.content ?? "";
-    const parsed = safeParseJson<Array<any>>(content);
+    const parsed = safeParseJson<Array<ForecastPoint>>(content);
 
     if (!parsed) {
       const fallback = buildGlobalForecastFallback();
-      setCache(cacheKey, fallback, FORECAST_CACHE_MS);
+      await setCache(cacheKey, fallback, FORECAST_CACHE_MS);
       return Response.json(fallback, { status: 200 });
     }
 
@@ -95,11 +90,11 @@ export default async function handler(req: Request): Promise<Response> {
         water: { avg: Number(p.water?.avg ?? 0), min: Number(p.water?.min ?? 0), max: Number(p.water?.max ?? 0) },
       }));
 
-    setCache(cacheKey, validated, FORECAST_CACHE_MS);
+    await setCache(cacheKey, validated, FORECAST_CACHE_MS);
     return Response.json(validated, { status: 200 });
   } catch (error) {
     console.error("AI forecast error:", error);
     const fallback = buildGlobalForecastFallback();
-    return Response.json(fallback, { status: 200 });
+    return Response.json(fallback, { status: 503 });
   }
 }
