@@ -6,21 +6,11 @@ import { tinyfishRouter } from "./_shared/tinyfishRouter.js";
 interface HealthResponse {
   kiloGateway: {
     available: boolean;
-    zeroCostModels: string[];
-    defaultModel: string;
-    activeModel: string | null;
-    configuredKeys: number;
     usableKeys: number;
-    rateLimitedKeys: number[];
-    rateLimitedModels: string[];
-    globalRateLimited: boolean;
-    catalogLastRefresh: string | null;
   };
   tinyfish: {
     available: boolean;
-    configuredKeys: number;
     usableKeys: number;
-    rateLimitedKeys: number[];
   };
   onlineModelConnected: boolean;
   analytics: {
@@ -55,13 +45,12 @@ interface HealthResponse {
   };
 }
 
-export default async function handler(_req: any, res: any): Promise<void> {
+export default async function handler(_req: Request): Promise<Response> {
   try {
     const kiloStatus = await kiloRouter.getKiloStatus();
     const tinyfishStatus = await tinyfishRouter.getTinyfishStatus();
 
-    // Check analytics availability (deterministic, always available)
-    const globalAnalytics = getGlobalAnalytics();
+    const globalAnalytics = await getGlobalAnalytics();
     const regionalAnalytics: Record<Region, { lastFetch: string | null; success: boolean }> = {} as Record<
       Region,
       { lastFetch: string | null; success: boolean }
@@ -69,7 +58,7 @@ export default async function handler(_req: any, res: any): Promise<void> {
 
     for (const region of Object.keys(REGION_NAMES) as Region[]) {
       try {
-        getRegionalAnalytics(region);
+        await getRegionalAnalytics(region);
         regionalAnalytics[region] = {
           lastFetch: new Date().toISOString(),
           success: true,
@@ -93,21 +82,11 @@ export default async function handler(_req: any, res: any): Promise<void> {
     const response: HealthResponse = {
       kiloGateway: {
         available: kiloStatus.available,
-        zeroCostModels: kiloStatus.zeroCostModels,
-        defaultModel: kiloStatus.defaultModel,
-        activeModel: kiloStatus.activeModel,
-        configuredKeys: kiloStatus.configuredKeys,
         usableKeys: kiloStatus.usableKeys,
-        rateLimitedKeys: kiloStatus.rateLimitedKeys,
-        rateLimitedModels: kiloStatus.rateLimitedModels,
-        globalRateLimited: kiloStatus.globalRateLimited,
-        catalogLastRefresh: kiloStatus.catalogLastRefresh,
       },
       tinyfish: {
         available: tinyfishStatus.available,
-        configuredKeys: tinyfishStatus.configuredKeys,
         usableKeys: tinyfishStatus.usableKeys,
-        rateLimitedKeys: tinyfishStatus.rateLimitedKeys,
       },
       onlineModelConnected,
       analytics: {
@@ -146,13 +125,12 @@ export default async function handler(_req: any, res: any): Promise<void> {
       },
     };
 
-    res.status(200).json(response);
+    return Response.json(response);
   } catch (error) {
-    // Never expose raw errors to the client
     console.error("Health check failed:", error);
-    res.status(503).json({
+    return Response.json({
       error: "Health check temporarily unavailable",
       onlineModelConnected: false,
-    });
+    }, { status: 503 });
   }
 }

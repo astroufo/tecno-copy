@@ -1,4 +1,4 @@
-import { randomBytes, randomFillSync } from "crypto";
+import { sanitizeError } from "./validation.js";
 import {
   KILO_GATEWAY_MODELS_URL,
   KILO_GATEWAY_CHAT_URL,
@@ -13,11 +13,12 @@ import { getCache, setCache } from "./cache.js";
 import { KiloResponse, KiloStatus } from "./types.js";
 
 function makeId(prefix = "chatcmpl"): string {
-  if (typeof randomBytes === "function") {
-    return `${prefix}-${randomBytes(12).toString("hex")}`;
+  try {
+    const arr = crypto.getRandomValues(new Uint32Array(3));
+    return `${prefix}-${Array.from(arr).map((v) => v.toString(16).padStart(8, "0")).join("").slice(0, 24)}`;
+  } catch {
+    return `${prefix}-${Math.random().toString(36).substring(2, 11)}`;
   }
-  // Fallback for environments without crypto.randomBytes
-  return `${prefix}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
 export interface KiloKeyState {
@@ -60,6 +61,14 @@ interface KiloModelCatalogEntry {
     [key: string]: unknown;
   };
   [key: string]: unknown;
+}
+
+export interface KiloInferPayload {
+  messages: Array<{ role: string; content: string }>;
+  model?: string;
+  max_tokens?: number;
+  temperature?: number;
+  response_format?: unknown;
 }
 
 export class KiloRouter {
@@ -111,7 +120,7 @@ export class KiloRouter {
   }
 
   async refreshKiloModels(force: boolean = false): Promise<void> {
-    const cached = getCache<{ models: KiloModelCatalogEntry[]; timestamp: number }>(
+    const cached = await getCache<{ models: KiloModelCatalogEntry[]; timestamp: number }>(
       "kilo:model-catalog",
       MODEL_CACHE_MS
     );
@@ -141,7 +150,7 @@ export class KiloRouter {
 
       this.modelCandidates = this.buildCandidatePool(models);
       this.catalogLastRefresh = new Date().toISOString();
-      setCache("kilo:model-catalog", { models, timestamp: Date.now() }, MODEL_CACHE_MS);
+      await setCache("kilo:model-catalog", { models, timestamp: Date.now() }, MODEL_CACHE_MS);
     } catch (error) {
       console.error("Kilo model catalog refresh failed:", error);
     }
@@ -207,7 +216,7 @@ export class KiloRouter {
     rateLimitScope?: "key" | "model" | "global" | "unknown" | null;
   }> {
     const probeKey = `kilo:access-probe:${keyState.keyIndex}:${modelCandidate.modelId}`;
-    const cached = getCache<{ success: boolean; inputPrice: number | null; outputPrice: number | null }>(
+    const cached = await getCache<{ success: boolean; inputPrice: number | null; outputPrice: number | null }>(
       probeKey,
       ACCESS_PROBE_CACHE_MS
     );
@@ -253,7 +262,7 @@ export class KiloRouter {
           inputPrice: modelCandidate.inputPrice,
           outputPrice: modelCandidate.outputPrice,
         };
-        setCache(probeKey, result, ACCESS_PROBE_CACHE_MS);
+        await setCache(probeKey, result, ACCESS_PROBE_CACHE_MS);
         return result;
       }
 
@@ -328,7 +337,7 @@ export class KiloRouter {
       return { success: false };
     } catch (error) {
       // Network errors or timeouts
-      console.error("Kilo access probe failed:", error);
+      console.error("Kilo access probe failed:", sanitizeError(String(error)));
       keyState.available = false;
       keyState.lastCheckedAt = new Date().toISOString();
       return { success: false };
@@ -366,7 +375,7 @@ export class KiloRouter {
     return null;
   }
 
-  async kiloInfer(payload: any): Promise<KiloResponse> {
+  async kiloInfer(payload: KiloInferPayload): Promise<KiloResponse> {
     if (!this.initialized) {
       await this.initKiloRouter();
     }
@@ -570,8 +579,7 @@ const result: KiloResponse = {
   private shuffle<T>(array: T[]): T[] {
     const result = [...array];
     for (let i = result.length - 1; i > 0; i--) {
-      const cryptoArray = new Uint32Array(1);
-      randomFillSync(cryptoArray);
+      const cryptoArray = crypto.getRandomValues(new Uint32Array(1));
       const j = cryptoArray[0] % (i + 1);
       [result[i], result[j]] = [result[j], result[i]];
     }

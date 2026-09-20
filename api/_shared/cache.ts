@@ -1,56 +1,102 @@
+import { getRedis } from "./redis.js";
+
 export interface CacheEntry<T> {
   data: T;
   expiresAt: number;
 }
 
-export function getCache<T>(key: string, _ttlMs: number): T | null {
-  const entry = (globalThis as Record<string, unknown>).__cache as Map<string, CacheEntry<T>> | undefined;
-  if (!entry) return null;
-  const cached = entry.get(key);
-  if (!cached) return null;
-  if (Date.now() > cached.expiresAt) {
-    entry.delete(key);
-    return null;
+const memoryCache: Map<string, CacheEntry<unknown>> = new Map();
+const inFlight = new Map<string, Promise<unknown>>();
+
+function getMemoryCache<T>(): Map<string, CacheEntry<T>> {
+  return memoryCache as Map<string, CacheEntry<T>>;
+}
+
+export async function getCache<T>(key: string, _ttlMs: number): Promise<T | null> {
+  const memory = getMemoryCache<T>();
+  const mem = memory.get(key);
+  if (mem && Date.now() < mem.expiresAt) return mem.data;
+
+  const redis = await getRedis();
+  if (redis) {
+    try {
+      const raw = await redis.get(`cache:${key}`);
+      if (raw) {
+        const parsed: { expiresAt: number; data: T } = JSON.parse(raw);
+        if (Date.now() < parsed.expiresAt) {
+          memory.set(key, { data: parsed.data, expiresAt: parsed.expiresAt });
+          return parsed.data;
+        }
+        await redis.del(`cache:${key}`);
+      }
+    } catch {
+      // Redis is optional and non-fatal.
+    }
   }
-  return cached.data;
+
+  return null;
 }
 
-export function setCache<T>(key: string, data: T, ttlMs: number): void {
-  let entry = (globalThis as Record<string, unknown>).__cache as Map<string, CacheEntry<T>> | undefined;
-  if (!entry) {
-    entry = new Map();
-    (globalThis as Record<string, unknown>).__cache = entry;
+export async function setCache<T>(key: string, data: T, ttlMs: number): Promise<void> {
+  const expiresAt = Date.now() + ttlMs;
+  const memory = getMemoryCache<T>();
+  memory.set(key, { data, expiresAt });
+
+  const redis = await getRedis();
+  if (redis) {
+    try {
+      const ttlSeconds = Math.max(1, Math.floor((expiresAt - Date.now()) / 1000));
+      await redis.set(`cache:${key}`, JSON.stringify({ expiresAt, data }), ttlSeconds);
+    } catch {
+      // Redis is optional and non-fatal.
+    }
   }
-  entry.set(key, { data, expiresAt: Date.now() + ttlMs });
 }
 
-export function deleteCache(key: string): void {
-  const entry = (globalThis as Record<string, unknown>).__cache as Map<string, CacheEntry<unknown>> | undefined;
-  entry?.delete(key);
+export async function deleteCache(key: string): Promise<void> {
+  const memory = getMemoryCache<unknown>();
+  memory.delete(key);
+  const redis = await getRedis();
+  if (redis) {
+    try {
+      await redis.del(`cache:${key}`);
+    } catch {}
+  }
 }
 
-export function clearCache(): void {
-  (globalThis as Record<string, unknown>).__cache = new Map();
+export async function clearCache(): Promise<void> {
+  memoryCache.clear();
+  const redis = await getRedis();
+  if (redis) {
+    try {
+      for (const [key] of memoryCache) {
+        await redis.del(`cache:${key}`);
+      }
+    } catch {}
+  }
 }
 
-export function getCacheOrSet<T>(
+export async function getCacheOrSet<T>(
   key: string,
   factory: () => T | Promise<T>,
   ttlMs: number,
-): T | Promise<T> {
-  const cached = getCache<T>(key, ttlMs);
+): Promise<T> {
+  const cached = await getCache<T>(key, ttlMs);
   if (cached !== null) return cached;
-  const result = factory();
-  if (result instanceof Promise) {
-    return result.then((data) => {
-      setCache(key, data, ttlMs);
-      return data;
-    });
+
+  if (inFlight.has(key)) {
+    return inFlight.get(key) as Promise<T>;
   }
-  setCache(key, result, ttlMs);
-  return result;
+
+  const promise = Promise.resolve(factory()).then(async (data) => {
+    inFlight.delete(key);
+    await setCache(key, data, ttlMs);
+    return data;
+  });
+  inFlight.set(key, promise);
+  return promise;
 }
 
-export function invalidateCache(key: string): void {
-  deleteCache(key);
+export async function invalidateCache(key: string): Promise<void> {
+  await deleteCache(key);
 }

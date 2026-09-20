@@ -1,6 +1,7 @@
 import {
   TINYFISH_KEY_ENV_NAMES,
   readConfiguredKeys,
+  sanitizeUrl,
 } from "./http.js";
 import { getCache, setCache } from "./cache.js";
 import type { Region } from "./regions.js";
@@ -153,7 +154,7 @@ export class TinyFishRouter {
     }
 
     const cacheKey = `tinyfish:search:${query}:${options.region ?? "global"}`;
-    const cached = getCache<TinyFishSearchResponse>(cacheKey, 10 * 60 * 1000);
+    const cached = await getCache<TinyFishSearchResponse>(cacheKey, 10 * 60 * 1000);
     if (cached) return cached;
 
     let keyState = this.selectKey();
@@ -211,7 +212,7 @@ export class TinyFishRouter {
             if (Number.isFinite(parsed)) keyState.rateLimitRemaining = parsed;
           }
 
-          setCache(cacheKey, result, 10 * 60 * 1000);
+          await setCache(cacheKey, result, 10 * 60 * 1000);
           return result;
         }
 
@@ -237,7 +238,7 @@ export class TinyFishRouter {
       keyState = this.selectKey();
     }
 
-    const cachedFallback = getCache<TinyFishSearchResponse>(
+    const cachedFallback = await getCache<TinyFishSearchResponse>(
       cacheKey,
       60 * 60 * 1000
     );
@@ -252,9 +253,10 @@ export class TinyFishRouter {
       await this.refreshTinyfishStatus(true);
     }
 
-    const safeUrl = url;
+    const safeUrl = sanitizeUrl(url);
+    if (!safeUrl) return null;
     const cacheKey = `tinyfish:scrape:${safeUrl}`;
-    const cached = getCache<ScrapedContent>(cacheKey, 10 * 60 * 1000);
+    const cached = await getCache<ScrapedContent>(cacheKey, 10 * 60 * 1000);
     if (cached) return cached;
 
     let keyState = this.selectKey();
@@ -303,7 +305,7 @@ export class TinyFishRouter {
           keyState.lastCheckedAt = new Date().toISOString();
           keyState.lastSuccessAt = keyState.lastCheckedAt;
 
-          setCache(cacheKey, result, 10 * 60 * 1000);
+          await setCache(cacheKey, result, 10 * 60 * 1000);
           return result;
         }
 

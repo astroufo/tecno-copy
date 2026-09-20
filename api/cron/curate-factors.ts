@@ -1,15 +1,26 @@
-import { kiloRouter } from "./_shared/kiloRouter.js";
-import { tinyfishRouter } from "./_shared/tinyfishRouter.js";
-import { REGION_NAMES, isRegion, type Region } from "./_shared/regions.js";
-import { getRegionalAnalytics } from "./_shared/deterministicAnalytics.js";
-import { FACTORS_CACHE_MS, sanitizeUrl } from "./_shared/http.js";
-import { getCache, setCache } from "./_shared/cache.js";
-import { safeParseJson, sanitizeError } from "./_shared/validation.js";
-import type { Factor } from "./_shared/types.js";
+import { kiloRouter } from "../_shared/kiloRouter.js";
+import { tinyfishRouter } from "../_shared/tinyfishRouter.js";
+import { REGION_NAMES, type Region } from "../_shared/regions.js";
+import { getGlobalAnalytics, getRegionalAnalytics } from "../_shared/deterministicAnalytics.js";
+import { FACTORS_CACHE_MS } from "../_shared/http.js";
+import { getCache, setCache } from "../_shared/cache.js";
+import { safeParseJson, sanitizeError } from "../_shared/validation.js";
+import type { Factor } from "../_shared/types.js";
 
 const MAX_FACTORS = 8;
+const REGIONS: Region[] = ["asia", "europe", "africa", "americas", "oceania"];
+
+const SYSTEM_PROMPT_GLOBAL =
+  "You are a Senior Commodity Risk Analyst. You are provided with current global market analytics, an existing list of global price factors, and fresh validated news excerpts collected through TinyFish.\n\nValidate each candidate trend against the supplied current global market conditions and source evidence.\n\nDetermine whether each candidate is a legitimate market-moving trend or noise at a global scale. Reject stale, duplicate, promotional, speculative, unsupported, irrelevant, or weakly evidenced claims.\n\nFor each legitimate trend, evaluate its expected effect on global oil, electricity, or water prices. Assign an integer importance score from 0 to 100 based on evidence quality, geographic scope, affected commodities, expected price impact, duration, and immediacy.\n\nExplain why each approved trend is legitimate and globally relevant right now. Use only the supplied analytics, factors, excerpts, and source URLs. Do not invent sources or facts.\n\nReturn strict JSON only. Do not return markdown or commentary outside JSON.\n\nThe response must contain exactly eight validated global factors matching the required schema. If a new legitimate trend is identified, include its new factor details. The deterministic server-side application logic will handle duplicate detection, importance thresholds, timestamps, and removal of the oldest factor.";
+
 const SYSTEM_PROMPT_REGIONAL = (regionName: string) =>
   `You are a Senior Commodity Risk Analyst specializing in ${regionName} energy and water markets. You are provided with current ${regionName}-specific market analytics, an existing list of ${regionName} price factors, and fresh validated news excerpts collected through TinyFish that are relevant to ${regionName}.\n\nValidate each candidate trend against the supplied current ${regionName} market conditions and source evidence.\n\nDetermine whether each candidate is a legitimate market-moving trend or noise within ${regionName}. Reject stale, duplicate, promotional, speculative, unsupported, irrelevant, or weakly evidenced claims. Reject any trend that is purely global with no demonstrated ${regionName}-specific price impact.\n\nFor each legitimate trend, evaluate its expected effect on ${regionName} oil, electricity, or water prices specifically. Assign an integer importance score from 0 to 100 based on evidence quality, ${regionName} geographic scope, affected commodities, expected regional price impact, duration, and immediacy within ${regionName}.\n\nExplain why each approved trend is legitimate and relevant to ${regionName} right now. Use only the supplied analytics, factors, excerpts, and source URLs. Do not invent sources or facts.\n\nReturn strict JSON only. Do not return markdown or commentary outside JSON.\n\nThe response must contain exactly eight validated ${regionName} factors matching the required schema. If a new legitimate trend is identified for ${regionName}, include its new factor details. The deterministic server-side application logic will handle duplicate detection, importance thresholds, timestamps, and removal of the oldest factor.`;
+
+const GLOBAL_QUERIES = [
+  "global oil market prices OPEC supply demand 2026",
+  "global electricity power prices renewable energy grid 2026",
+  "global water prices scarcity drought utilities 2026",
+];
 
 const REGION_QUERIES: Record<Region, string[]> = {
   asia: [
@@ -40,60 +51,16 @@ const REGION_QUERIES: Record<Region, string[]> = {
 };
 
 const REPUTABLE_HOSTS = [
-  "opec.org",
-  "iea.org",
-  "eia.gov",
-  "worldbank.org",
-  "un.org",
-  "unep.org",
-  "wri.org",
-  "wrm.org",
-  "oecd.org",
-  "imf.org",
-  "reuters.com",
-  "apnews.com",
-  "ft.com",
-  "bloomberg.com",
-  "energy.gov",
-  "eurostat.europa.eu",
-  "afdb.org",
-  "adb.org",
-  "asean.org",
-  "europa.eu",
-  "gov.au",
-  "govt.nz",
-  "gov.za",
-  "gov.ng",
-  "gov.in",
-  "gov.cn",
-  "gov.br",
-  "gov.mx",
-  "gov.ar",
-  "gov.eg",
-  "gov.ae",
-  "gov.sa",
-  "gov.qa",
-  "gov.tr",
-  "gov.id",
-  "gov.my",
-  "gov.ph",
-  "gov.vn",
-  "ieeewrc.org",
-  "irena.org",
-  "cdn.irena.org",
-  "globalpetrolprices.com",
-  "waterplaza.nl",
-  "waterworld.com",
-  "wateronline.com",
-  "energyinst.org",
-  "enerdata.net",
-  "platts.com",
-  "gulfnews.com",
-  "thenationalnews.com",
-  "thegazette.co.jm",
-  "businessday.ng",
-  "allafrica.com",
-  "africanews.com",
+  "opec.org", "iea.org", "eia.gov", "worldbank.org", "un.org", "unep.org",
+  "wri.org", "wrm.org", "oecd.org", "imf.org", "reuters.com", "apnews.com",
+  "ft.com", "bloomberg.com", "energy.gov", "eurostat.europa.eu", "afdb.org",
+  "adb.org", "asean.org", "europa.eu", "gov.au", "govt.nz", "gov.za", "gov.ng",
+  "gov.in", "gov.cn", "gov.br", "gov.mx", "gov.ar", "gov.eg", "gov.ae", "gov.sa",
+  "gov.qa", "gov.tr", "gov.id", "gov.my", "gov.ph", "gov.vn", "ieeewrc.org",
+  "irena.org", "cdn.irena.org", "globalpetrolprices.com", "waterplaza.nl",
+  "waterworld.com", "wateronline.com", "energyinst.org", "enerdata.net",
+  "platts.com", "gulfnews.com", "thenationalnews.com", "thegazette.co.jm",
+  "businessday.ng", "allafrica.com", "africanews.com", "screendaily.com",
 ];
 
 const RECENT_MONTH = () =>
@@ -116,7 +83,7 @@ function isRecentPublishedAt(value: string | undefined): boolean {
   return date >= cutoff;
 }
 
-function normalizeFactor(raw: unknown, scope: Region, region: Region): Factor | null {
+function normalizeFactor(raw: unknown, scope: "global" | Region, region: Region | null): Factor | null {
   if (!raw || typeof raw !== "object") return null;
   const f = raw as Record<string, unknown>;
   const name = typeof f.name === "string" ? f.name.trim() : "";
@@ -127,7 +94,6 @@ function normalizeFactor(raw: unknown, scope: Region, region: Region): Factor | 
   const direction = f.direction === "up" || f.direction === "down" || f.direction === "mixed" ? f.direction : "mixed";
   const magnitude = f.magnitude === "High" || f.magnitude === "Medium" || f.magnitude === "Low" ? f.magnitude : "Medium";
   const bias = f.bias === "short" || f.bias === "mid" || f.bias === "long" || f.bias === "flat" ? f.bias : "flat";
-  const sourceUrl = sanitizeUrl(source);
   const importanceScore =
     typeof f.importanceScore === "number" && Number.isFinite(f.importanceScore)
       ? Math.max(0, Math.min(100, Math.round(f.importanceScore)))
@@ -138,9 +104,13 @@ function normalizeFactor(raw: unknown, scope: Region, region: Region): Factor | 
   const regions =
     f.regions && Array.isArray(f.regions)
       ? ((f.regions as string[]).filter((r) => r === "global" || (REGION_NAMES as Record<string, string>)[r]))
-      : [region];
+      : scope === "global"
+        ? ["global"]
+        : region
+          ? [region]
+          : [];
 
-  if (!name || !explanation || !sourceUrl || importanceScore < 20 || commodities.length === 0) return null;
+  if (!name || !explanation || !source || importanceScore < 20 || commodities.length === 0) return null;
 
   return {
     id: id.slice(0, 80),
@@ -150,9 +120,9 @@ function normalizeFactor(raw: unknown, scope: Region, region: Region): Factor | 
     explanation: explanation.slice(0, 1200),
     direction,
     magnitude,
-    source: sourceUrl,
+    source,
     bias,
-drift:
+    drift:
       f.drift && typeof f.drift === "object"
         ? {
             ...(typeof (f.drift as Record<string, unknown>).oil === "number" && Number.isFinite((f.drift as Record<string, unknown>).oil) ? { oil: (f.drift as Record<string, unknown>).oil as number } : {}),
@@ -183,7 +153,10 @@ function dedupeFactors(factors: Factor[]): Factor[] {
 function replaceOldest(factors: Factor[], incoming: Factor[]): Factor[] {
   let next = [...factors, ...incoming];
   next = dedupeFactors(next);
-  next = next.filter((f) => f.scope === incoming[0]?.scope);
+  const byScope = (f: Factor) => f.scope;
+  const currentScope = (f: Factor): boolean =>
+    f.scope === "global" || (byScope(f) as string) === (incoming[0]?.scope as string);
+  next = next.filter(currentScope);
   if (next.length > MAX_FACTORS) {
     const oldest = next
       .map((f) => ({ f, ts: Date.parse(f.createdAt) || 0 }))
@@ -195,28 +168,30 @@ function replaceOldest(factors: Factor[], incoming: Factor[]): Factor[] {
   return next.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, MAX_FACTORS);
 }
 
-function buildFallbackFactors(scope: Region, region: Region): Factor[] {
+function buildFallbackFactors(scope: "global" | Region, region: Region | null): Factor[] {
   const now = new Date().toISOString();
-  const names: Record<Region, string[]> = {
+  const names: Record<"global" | Region, string[]> = {
+    global: ["OPEC+ Production Decisions", "Geopolitical Tensions & Supply Disruptions", "Demand Growth in China & India", "Renewable Energy Buildout", "Weather & Temperature Extremes", "Water Scarcity & Drought", "Desalination & Reuse Technology", "Grid & Water Infrastructure Investment"],
     asia: ["China & India Energy Demand Growth", "ASEAN Grid Interconnection", "Coal-to-Gas Switching", "Strait of Hormuz Risk", "Urbanization & Desalination", "Renewable Energy Buildout", "Monsoon & Hydropower Variability", "EV Adoption & Battery Storage"],
     europe: ["EU ETS Carbon Price", "Russian Supply Displacement", "Renewables Curtailment Risk", "Drought & Alpine Hydro", "Nuclear & Gas Generation Mix", "Energy Efficiency Mandates", "Offshore Wind Expansion", "Heat Pump Electrification"],
     africa: ["Nigeria & Angola Production", "Diesel Genset Dependence", "Drought & Sahel Scarcity", "Subsidy Reform Pressure", "Hydroelectric Reliance", "Solar Mini-Grid Deployment", "Copper & Critical Minerals Demand", "Diesel Import Parity Pricing"],
     americas: ["US Shale Productivity", "Henry Hub Gas to Power", "LatAm Hydrology & Drought", "Pipeline & Export Capacity", "California Water Stress", "Grid Resilience Investment", "EV Adoption & Battery Storage", "LNG Export Growth"],
     oceania: ["LNG Export Linkage", "NEM & NZ Wholesale Spikes", "Millennium Drought Legacy", "Remote Island Fuel Premiums", "Desalination & Reuse", "Renewable Energy Zones", "Coal Plant Retirements", "Urban Water Tariff Reform"],
   };
+  const source = scope === "global" ? "Public market benchmarks (EIA, IEA, OPEC, UN-Water)" : `${REGION_NAMES[(region ?? "asia") as Region]} regional energy authorities and public benchmarks`;
   const commodities: Factor["commodities"] = ["oil", "electricity", "water"];
   return names[scope].slice(0, MAX_FACTORS).map((name, i) => ({
     id: `fallback-${scope}-${i + 1}`,
     name,
     category: i % 3 === 0 ? "Policy" : i % 3 === 1 ? "Market" : "Structural",
     commodities,
-    explanation: `Static ${REGION_NAMES[region]} regional fallback factor maintained when live AI curation is unavailable.`,
+    explanation: `Static ${scope === "global" ? "global" : REGION_NAMES[(region ?? "asia") as Region]} fallback factor maintained when live AI curation is unavailable.`,
     direction: i % 3 === 2 ? "mixed" : i % 2 === 0 ? "up" : "down",
     magnitude: (["High", "Medium", "Low"] as const)[i % 3],
-    source: `${REGION_NAMES[region]} regional energy authorities and public benchmarks`,
+    source,
     bias: (["short", "mid", "long", "flat"] as const)[i % 4],
     drift: {},
-    regions: [region],
+    regions: scope === "global" ? ["global"] : [region ?? "global"],
     scope,
     importanceScore: 70 - i * 2,
     createdAt: now,
@@ -224,13 +199,14 @@ function buildFallbackFactors(scope: Region, region: Region): Factor[] {
   }));
 }
 
-async function runFactorAnalysis(scope: Region, region: Region): Promise<Factor[]> {
-  const current = await getCache<Factor[]>(`dynamic-factors:${scope}`, FACTORS_CACHE_MS);
+async function runFactorAnalysis(scope: "global" | Region, region: Region | null): Promise<Factor[]> {
+  const cacheKey = `dynamic-factors:${scope}`;
+  const current = await getCache<Factor[]>(cacheKey, FACTORS_CACHE_MS);
   if (current) return current;
-  const analytics = await getRegionalAnalytics(region);
+  const analytics = scope === "global" ? await getGlobalAnalytics() : await getRegionalAnalytics(region!);
   const existing = current ?? buildFallbackFactors(scope, region);
-  const searchQuery = REGION_QUERIES[region][0];
-  const search = await tinyfishRouter.tinyfishSearch(`${searchQuery} ${RECENT_MONTH()}`, { limit: 10, region });
+  const searchQuery = (REGION_QUERIES[region ?? "asia"] ?? GLOBAL_QUERIES)[0];
+  const search = await tinyfishRouter.tinyfishSearch(`${searchQuery} ${RECENT_MONTH()}`, { limit: 10, region: region ?? undefined });
   const candidates = search.results
     .map((r) => ({ ...r, snippet: typeof r.snippet === "string" ? r.snippet : "" }))
     .filter((r) => isReputableSource(r.url) && isRecentPublishedAt(r.publishedAt))
@@ -240,22 +216,28 @@ async function runFactorAnalysis(scope: Region, region: Region): Promise<Factor[
     candidates.map(async (r) => {
       try {
         const scraped = await tinyfishRouter.tinyfishScrape(r.url);
-        return scraped ? { ...r, text: scraped.text, title: scraped.title || r.title } : r;
+        return scraped
+          ? { ...r, text: scraped.text, title: scraped.title || r.title }
+          : r;
       } catch {
         return r;
       }
     }),
   );
+  const prompt =
+    scope === "global"
+      ? SYSTEM_PROMPT_GLOBAL
+      : SYSTEM_PROMPT_REGIONAL(REGION_NAMES[(region ?? "asia") as Region]);
   const payload = {
     messages: [
-      { role: "system", content: SYSTEM_PROMPT_REGIONAL(REGION_NAMES[region]) },
+      { role: "system", content: prompt },
       {
         role: "user",
         content: JSON.stringify({
           analytics,
           existingFactors: existing,
           candidates: excerpts.map((c) => ({ title: c.title, source: c.url, snippet: c.snippet?.slice(0, 2500), text: (c as any).text?.slice(0, 8000) })),
-          region,
+          region: region ?? null,
           month: RECENT_MONTH(),
         }),
       },
@@ -270,35 +252,40 @@ async function runFactorAnalysis(scope: Region, region: Region): Promise<Factor[
   const normalized = parsed.factors
     .map((f) => normalizeFactor(f, scope, region))
     .filter((f): f is Factor => f !== null)
-    .filter((f) => f.scope === scope)
+    .filter((f) => f.scope === scope || (scope === "global" && f.regions?.includes("global")))
     .slice(0, MAX_FACTORS);
   return replaceOldest(existing, normalized);
 }
 
-export default async function handler(req: Request): Promise<Response> {
+export default async function handler(_req: Request): Promise<Response> {
   try {
-    const url = new URL(req.url);
-    const force = url.searchParams.get("force") === "true";
-    const regionParam = url.searchParams.get("region");
-    if (!regionParam || !isRegion(regionParam)) {
-      return Response.json({ error: "Missing or invalid 'region' query parameter. Must be one of: asia, europe, africa, americas, oceania" }, { status: 400 });
+    const results: Record<string, { success: boolean; count: number; error?: string }> = {};
+
+    // Curate global factors
+    try {
+      const globalFactors = await runFactorAnalysis("global", null);
+      const cacheKey = `dynamic-factors:global`;
+      await setCache(cacheKey, globalFactors, FACTORS_CACHE_MS);
+      results.global = { success: true, count: globalFactors.length };
+    } catch (error) {
+      results.global = { success: false, count: 0, error: sanitizeError(String(error)) };
     }
-    const region = regionParam as Region;
-    const cacheKey = `dynamic-factors:${region}`;
-    if (!force) {
-      const cached = await getCache<Factor[]>(cacheKey, FACTORS_CACHE_MS);
-      if (cached) {
-        return Response.json({ factors: cached, scope: region, count: cached.length, aiCurated: true, cacheKey, updatedAt: new Date().toISOString() }, { status: 200 });
+
+    // Curate regional factors for all regions
+    for (const region of REGIONS) {
+      try {
+        const regionalFactors = await runFactorAnalysis(region, region);
+        const cacheKey = `dynamic-factors:${region}`;
+        await setCache(cacheKey, regionalFactors, FACTORS_CACHE_MS);
+        results[region] = { success: true, count: regionalFactors.length };
+      } catch (error) {
+        results[region] = { success: false, count: 0, error: sanitizeError(String(error)) };
       }
     }
-    const factors = await runFactorAnalysis(region, region);
-    await setCache(cacheKey, factors, FACTORS_CACHE_MS);
-    return Response.json({ factors, scope: region, count: factors.length, aiCurated: true, cacheKey, updatedAt: new Date().toISOString() }, { status: 200 });
+
+    return Response.json({ success: true, curated: results, timestamp: new Date().toISOString() }, { status: 200 });
   } catch (error) {
-    console.error("Regional factors error:", sanitizeError(String(error)));
-    const regionParam = new URL(req.url).searchParams.get("region");
-    const region = isRegion(regionParam) ? (regionParam as Region) : "asia";
-    const fallback = buildFallbackFactors(region, region);
-    return Response.json({ factors: fallback, scope: region, count: fallback.length, aiCurated: false, cacheKey: `dynamic-factors:${region}`, updatedAt: new Date().toISOString(), error: "Regional factors temporarily unavailable; static fallbacks returned" }, { status: 200 });
+    console.error("Cron curation error:", sanitizeError(String(error)));
+    return Response.json({ success: false, error: "Cron curation failed" }, { status: 500 });
   }
 }
