@@ -52,7 +52,7 @@ export default async function handler(req: Request): Promise<Response> {
       return Response.json(fallback, { status: 200 });
     }
 
-    const analytics = getRegionalAnalytics(region);
+    const analytics = await getRegionalAnalytics(region);
     const search = await tinyfishRouter.tinyfishSearch(`${REGION_NAMES[region]} oil electricity water prices 2026`, { region });
     const factorsCache = await getCache<unknown[]>("dynamic-factors:global", FORECAST_CACHE_MS);
     const regionalFactorsCache = await getCache<unknown[]>(`dynamic-factors:${region}`, FORECAST_CACHE_MS);

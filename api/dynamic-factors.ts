@@ -245,9 +245,9 @@ function buildFallbackFactors(scope: "global" | Region, region: Region | null): 
 }
 
 async function runFactorAnalysis(scope: "global" | Region, region: Region | null): Promise<Factor[]> {
-  const current = getCache<Factor[]>(`dynamic-factors:${scope}`, FACTORS_CACHE_MS);
+  const current = await getCache<Factor[]>(`dynamic-factors:${scope}`, FACTORS_CACHE_MS);
   if (current) return current;
-  const analytics = scope === "global" ? getGlobalAnalytics() : getRegionalAnalytics(region!);
+  const analytics = scope === "global" ? await getGlobalAnalytics() : await getRegionalAnalytics(region!);
   const existing = current ?? buildFallbackFactors(scope, region);
   const searchQuery = (REGION_QUERIES[region ?? "asia"] ?? GLOBAL_QUERIES)[0];
   const search = await tinyfishRouter.tinyfishSearch(`${searchQuery} ${RECENT_MONTH()}`, { limit: 10, region: region ?? undefined });
@@ -313,13 +313,13 @@ export default async function handler(req: Request): Promise<Response> {
     }
     const cacheKey = `dynamic-factors:${scope}`;
     if (!force) {
-      const cached = getCache<Factor[]>(cacheKey, FACTORS_CACHE_MS);
+      const cached = await getCache<Factor[]>(cacheKey, FACTORS_CACHE_MS);
       if (cached) {
         return Response.json({ factors: cached, scope, count: cached.length, aiCurated: true, cacheKey, updatedAt: new Date().toISOString() }, { status: 200 });
       }
     }
     const factors = await runFactorAnalysis(scope, isGlobal ? null : scope as Region);
-    setCache(cacheKey, factors, FACTORS_CACHE_MS);
+    await setCache(cacheKey, factors, FACTORS_CACHE_MS);
     return Response.json({ factors, scope, count: factors.length, aiCurated: true, cacheKey, updatedAt: new Date().toISOString() }, { status: 200 });
   } catch (error) {
     console.error("Dynamic factors error:", sanitizeError(String(error)));

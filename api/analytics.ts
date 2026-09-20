@@ -10,7 +10,7 @@ export default async function handler(req: Request): Promise<Response> {
       await clearAnalyticsCache();
     }
 
-    const analytics = getGlobalAnalytics();
+    const analytics = await getGlobalAnalytics();
 
     return Response.json({
       ...analytics,

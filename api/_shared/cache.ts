@@ -12,7 +12,7 @@ function getMemoryCache<T>(): Map<string, CacheEntry<T>> {
   return memoryCache as Map<string, CacheEntry<T>>;
 }
 
-export async function getCache<T>(key: string, ttlMs: number): Promise<T | null> {
+export async function getCache<T>(key: string, _ttlMs: number): Promise<T | null> {
   const memory = getMemoryCache<T>();
   const mem = memory.get(key);
   if (mem && Date.now() < mem.expiresAt) return mem.data;

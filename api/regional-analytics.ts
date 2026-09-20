@@ -14,7 +14,7 @@ export default async function handler(req: Request): Promise<Response> {
     if (forceRefresh) {
       await clearAnalyticsCache();
     }
-    const analytics = getRegionalAnalytics(region);
+    const analytics = await getRegionalAnalytics(region);
     return Response.json({ ...analytics, cacheKey: `analytics:regional:${region}`, cacheExpiresAt: Date.now() + ANALYTICS_CACHE_MS }, { status: 200 });
   } catch (error) {
     return Response.json({ error: "Regional analytics temporarily unavailable" }, { status: 503 });

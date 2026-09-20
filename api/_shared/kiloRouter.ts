@@ -15,7 +15,7 @@ import { KiloResponse, KiloStatus } from "./types.js";
 function makeId(prefix = "chatcmpl"): string {
   try {
     const arr = crypto.getRandomValues(new Uint32Array(3));
-    return `${prefix}-${arr.map((v) => v.toString(16).padStart(8, "0")).join("")}`;
+    return `${prefix}-${Array.from(arr).map((v) => v.toString(16).padStart(8, "0")).join("").slice(0, 24)}`;
   } catch {
     return `${prefix}-${Math.random().toString(36).substring(2, 11)}`;
   }

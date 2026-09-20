@@ -41,7 +41,7 @@ export default async function handler(req: Request): Promise<Response> {
       return Response.json(fallback, { status: 200 });
     }
 
-    const analytics = getGlobalAnalytics();
+    const analytics = await getGlobalAnalytics();
     const factorsCache = await getCache("dynamic-factors:global", FORECAST_CACHE_MS);
     const factors = factorsCache ?? [];
 

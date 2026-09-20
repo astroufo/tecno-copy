@@ -28,7 +28,7 @@ async function getRedis() {
       }
     },
 
-    async set(key: string, value: string, ttlSeconds?: number): Promise<void> {
+    async set(_key: string, value: string, ttlSeconds?: number): Promise<void> {
       try {
         const ex = Math.max(1, Math.floor(ttlSeconds ?? 0));
         const response = await fetch(`${url}/set?ex=${ex}`, {

@@ -114,18 +114,18 @@ function computeAnalytics(
   return result as AnalyticsSnapshot;
 }
 
-export function getGlobalAnalytics(): AnalyticsSnapshot {
-  const cached = getCache<AnalyticsSnapshot>("analytics:global", ANALYTICS_CACHE_MS);
+export async function getGlobalAnalytics(): Promise<AnalyticsSnapshot> {
+  const cached = await getCache<AnalyticsSnapshot>("analytics:global", ANALYTICS_CACHE_MS);
   if (cached) return cached;
 
   const config = readConfig();
   const result = computeAnalytics(GLOBAL_DEFAULTS, config, "Global retail fuel, electricity and water benchmark (public composite)", false);
-  setCache("analytics:global", result, ANALYTICS_CACHE_MS);
+  await setCache("analytics:global", result, ANALYTICS_CACHE_MS);
   return result;
 }
 
-export function getRegionalAnalytics(region: Region): RegionalAnalyticsSnapshot {
-    const cached = getCache<RegionalAnalyticsSnapshot>(`analytics:regional:${region}`, ANALYTICS_CACHE_MS);
+export async function getRegionalAnalytics(region: Region): Promise<RegionalAnalyticsSnapshot> {
+    const cached = await getCache<RegionalAnalyticsSnapshot>(`analytics:regional:${region}`, ANALYTICS_CACHE_MS);
     if (cached) return cached;
 
     const config = readConfig();
@@ -144,7 +144,7 @@ export function getRegionalAnalytics(region: Region): RegionalAnalyticsSnapshot 
         false,
         region,
     );
-    setCache(`analytics:regional:${region}`, result, ANALYTICS_CACHE_MS);
+    await setCache(`analytics:regional:${region}`, result, ANALYTICS_CACHE_MS);
     return result as RegionalAnalyticsSnapshot;
 }
 

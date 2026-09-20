@@ -45,12 +45,12 @@ interface HealthResponse {
   };
 }
 
-export default async function handler(req: Request): Promise<Response> {
+export default async function handler(_req: Request): Promise<Response> {
   try {
     const kiloStatus = await kiloRouter.getKiloStatus();
     const tinyfishStatus = await tinyfishRouter.getTinyfishStatus();
 
-    const globalAnalytics = getGlobalAnalytics();
+    const globalAnalytics = await getGlobalAnalytics();
     const regionalAnalytics: Record<Region, { lastFetch: string | null; success: boolean }> = {} as Record<
       Region,
       { lastFetch: string | null; success: boolean }
@@ -58,7 +58,7 @@ export default async function handler(req: Request): Promise<Response> {
 
     for (const region of Object.keys(REGION_NAMES) as Region[]) {
       try {
-        getRegionalAnalytics(region);
+        await getRegionalAnalytics(region);
         regionalAnalytics[region] = {
           lastFetch: new Date().toISOString(),
           success: true,
