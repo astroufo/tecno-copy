@@ -65,11 +65,12 @@ export async function deleteCache(key: string): Promise<void> {
 }
 
 export async function clearCache(): Promise<void> {
+  const keys = Array.from(memoryCache.keys());
   memoryCache.clear();
   const redis = await getRedis();
   if (redis) {
     try {
-      for (const [key] of memoryCache) {
+      for (const key of keys) {
         await redis.del(`cache:${key}`);
       }
     } catch {}

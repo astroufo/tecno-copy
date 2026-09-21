@@ -204,7 +204,6 @@ async function runFactorAnalysis(scope: "global" | Region, region: Region | null
   const current = await getCache<Factor[]>(cacheKey, FACTORS_CACHE_MS);
   if (current) return current;
   const analytics = scope === "global" ? await getGlobalAnalytics() : await getRegionalAnalytics(region!);
-  const existing = current ?? buildFallbackFactors(scope, region);
   const searchQuery = (REGION_QUERIES[region ?? "asia"] ?? GLOBAL_QUERIES)[0];
   const search = await tinyfishRouter.tinyfishSearch(`${searchQuery} ${RECENT_MONTH()}`, { limit: 10, region: region ?? undefined });
   const candidates = search.results

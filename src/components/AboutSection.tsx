@@ -55,9 +55,10 @@ export default function AboutSection() {
             </h2>
             <p className="mt-3 text-sm leading-relaxed text-slate-400">
               TecnoIndicator is a demonstration of modern front-end data visualization: every number
-              is computed in your browser from publicly known drivers, with no backend and no API
-              keys. The goal is an honest, explorable illustration of how forecasters think about
-              uncertainty — not a crystal ball.
+              is computed in your browser from publicly known drivers, powered by AI-driven market
+              curation via Kilo Gateway and TinyFish API. The backend processes real-time news,
+              trends, and analytics to generate dynamic factors and strategic solutions that update
+              automatically.
             </p>
           </div>
         </Reveal>
@@ -112,8 +113,7 @@ export default function AboutSection() {
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
             <p>
               <span className="font-semibold text-amber-200">Important.</span>
-              The live water quote is a simulated client-side feed within a realistic global price
-              band — always verify against licensed data providers before making decisions.
+              The live water quote is an estimated value within a realistic global band — always verify against licensed data providers before making decisions.
             </p>
           </div>
         </Reveal>

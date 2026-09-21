@@ -192,13 +192,6 @@ function RegionCard({
   );
 }
 
-function isNewFactor(createdAt: string): boolean {
-  const created = new Date(createdAt);
-  const now = new Date();
-  const diffMs = now.getTime() - created.getTime();
-  return diffMs <= 10 * 60 * 1000;
-}
-
 function RegionalFactorCard({
   factor,
   index,
@@ -206,7 +199,6 @@ function RegionalFactorCard({
   factor: Factor;
   index: number;
 }) {
-  const isNew = isNewFactor(factor.createdAt);
 
   return (
     <article className="group relative flex flex-col overflow-hidden rounded-2xl border border-line bg-panel/60 p-4 transition-all duration-300 hover:border-line-strong hover:bg-panel">
@@ -222,11 +214,6 @@ function RegionalFactorCard({
           </div>
           <h4 className="mt-2 font-display text-sm font-semibold text-white leading-snug">
             {factor.name}
-            {isNew && (
-              <span className="ml-1.5 inline-flex items-center rounded-full bg-teal-500 px-1.5 py-0.5 text-[9px] font-semibold text-white">
-                New
-              </span>
-            )}
           </h4>
         </div>
         <span className="shrink-0 font-display text-[11px] font-bold text-slate-600">

@@ -42,6 +42,23 @@ interface HealthResponse {
         pollIntervalMs: number;
       }
     >;
+  },
+  dynamicSolutions: {
+    global: {
+      lastRun: string | null;
+      nextRun: string | null;
+      aiCurated: boolean;
+      pollIntervalMs: number;
+    };
+    regional: Record<
+      Region,
+      {
+        lastRun: string | null;
+        nextRun: string | null;
+        aiCurated: boolean;
+        pollIntervalMs: number;
+      }
+    >;
   };
 }
 
@@ -72,11 +89,10 @@ export default async function handler(_req: Request): Promise<Response> {
     }
 
     const onlineModelConnected =
-      process.env.AI_FORECAST_ENABLED === "true" &&
       kiloStatus.available &&
       kiloStatus.usableKeys > 0 &&
       kiloStatus.zeroCostModels.length > 0 &&
-      tinyfishStatus.available &&
+  tinyfishStatus.available &&
       tinyfishStatus.usableKeys > 0;
 
     const response: HealthResponse = {
@@ -111,6 +127,33 @@ export default async function handler(_req: Request): Promise<Response> {
               nextRun: null,
               aiCurated: false,
               pollIntervalMs: 120000,
+            },
+          ])
+        ) as Record<
+          Region,
+          {
+            lastRun: string | null;
+            nextRun: string | null;
+            aiCurated: boolean;
+            pollIntervalMs: number;
+          }
+        >,
+      },
+      dynamicSolutions: {
+        global: {
+          lastRun: null,
+          nextRun: null,
+          aiCurated: false,
+          pollIntervalMs: 180000,
+        },
+        regional: Object.fromEntries(
+          (Object.keys(REGION_NAMES) as Region[]).map((region) => [
+            region,
+            {
+              lastRun: null,
+              nextRun: null,
+              aiCurated: false,
+              pollIntervalMs: 180000,
             },
           ])
         ) as Record<

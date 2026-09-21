@@ -148,9 +148,11 @@ export async function getRegionalAnalytics(region: Region): Promise<RegionalAnal
     return result as RegionalAnalyticsSnapshot;
 }
 
-export function clearAnalyticsCache(): void {
-    ["analytics:global", ...Object.keys(REGION_NAMES).map((r) => `analytics:regional:${r}`)].forEach((key) => {
-        const entry = (globalThis as Record<string, unknown>).__cache as Map<string, { expiresAt: number }> | undefined;
-        entry?.delete(key);
-    });
+import { deleteCache } from "./cache.js";
+
+export async function clearAnalyticsCache(): Promise<void> {
+    const keys = ["analytics:global", ...Object.keys(REGION_NAMES).map((r) => `analytics:regional:${r}`)];
+    for (const key of keys) {
+        await deleteCache(key);
+    }
 }

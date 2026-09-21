@@ -228,14 +228,17 @@ async function runFactorAnalysis(scope: Region, region: Region): Promise<Factor[
   const current = await getCache<Factor[]>(`dynamic-factors:${scope}`, FACTORS_CACHE_MS);
   if (current) return current;
   const analytics = await getRegionalAnalytics(region);
-  const existing = current ?? buildFallbackFactors(scope, region);
   const searchQuery = REGION_QUERIES[region][0];
   const search = await tinyfishRouter.tinyfishSearch(`${searchQuery} ${RECENT_MONTH()}`, { limit: 10, region });
   const candidates = search.results
     .map((r) => ({ ...r, snippet: typeof r.snippet === "string" ? r.snippet : "" }))
     .filter((r) => isReputableSource(r.url) && isRecentPublishedAt(r.publishedAt))
     .slice(0, 5);
-  if (candidates.length === 0) return buildFallbackFactors(scope, region);
+  if (candidates.length === 0) {
+      const fallback = buildFallbackFactors(scope, region);
+      await setCache(cacheKey, fallback, FACTORS_CACHE_MS);
+      return fallback;
+    }
   const excerpts = await Promise.all(
     candidates.map(async (r) => {
       try {
@@ -290,8 +293,7 @@ export default async function handler(req: Request): Promise<Response> {
       if (cached) {
         return Response.json({ factors: cached, scope: region, count: cached.length, aiCurated: true, cacheKey, updatedAt: new Date().toISOString() }, { status: 200 });
       }
-    }
-    const factors = await runFactorAnalysis(region, region);
+    }    const factors = await runFactorAnalysis(region, region);
     await setCache(cacheKey, factors, FACTORS_CACHE_MS);
     return Response.json({ factors, scope: region, count: factors.length, aiCurated: true, cacheKey, updatedAt: new Date().toISOString() }, { status: 200 });
   } catch (error) {

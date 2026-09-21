@@ -4,6 +4,7 @@ import Hero from "./components/Hero";
 import ForecastTool from "./components/ForecastTool";
 import RegionalEvaluation from "./components/RegionalEvaluation";
 import FactorsSection from "./components/FactorsSection";
+import SolutionsSection from "./components/SolutionsSection";
 import AboutSection from "./components/AboutSection";
 import Footer from "./components/Footer";
 import { useLiveMarket } from "./hook/useLiveMarket";
@@ -11,6 +12,7 @@ import { generateForecast, type RegionId, FACTORS, REGIONAL_FACTORS, EVAL_REGION
 
 const ANALYTICS_POLL_MS = 60_000;
 const FACTORS_POLL_MS = 120_000;
+const SOLUTIONS_POLL_MS = 180_000;
 const HEALTH_POLL_MS = 5 * 60_000;
 const REGION_STAGGER_MS = 8_000;
 
@@ -32,10 +34,10 @@ export default function App() {
   } = useLiveMarket();
 
   const [healthStatus, setHealthStatus] = useState<"Initializing AI" | "Online Model Connected" | "Offline Model">("Initializing AI");
-  const [_onlineModelConnected, setOnlineModelConnected] = useState(false);
   const [globalFactors, setGlobalFactors] = useState<Factor[]>(FACTORS);
   const [regionalFactors, setRegionalFactors] = useState<Record<string, Factor[]>>({});
   const [_regionalAnalytics, setRegionalAnalytics] = useState<Record<string, unknown>>({});
+  const [dynamicSolutions, setDynamicSolutions] = useState<any[]>([]);
 
   const points = useMemo(
     () => generateForecast(prices, horizon, jitter, region),
@@ -62,7 +64,6 @@ export default function App() {
         if (!res.ok) throw new Error("Health check failed");
         const data = await res.json();
         if (active) {
-          setOnlineModelConnected(data.onlineModelConnected === true);
           setHealthStatus(data.onlineModelConnected === true ? "Online Model Connected" : "Offline Model");
         }
       } catch {
@@ -135,6 +136,25 @@ export default function App() {
     return () => { active = false; clearInterval(id); };
   }, []);
 
+  // Poll dynamic solutions
+  useEffect(() => {
+    let active = true;
+    const pollSolutions = async () => {
+      try {
+        const res = await fetch("/api/solutions");
+        if (res.ok) {
+          const data = await res.json();
+          if (active && Array.isArray(data.solutions) && data.solutions.length > 0) {
+            setDynamicSolutions(data.solutions);
+          }
+        }
+      } catch { /* ignore */ }
+    };
+    pollSolutions();
+    const id = setInterval(pollSolutions, SOLUTIONS_POLL_MS);
+    return () => { active = false; clearInterval(id); };
+  }, []);
+
   return (
     <div className="min-h-screen bg-base font-sans text-slate-200 antialiased">
       <Navbar />
@@ -169,6 +189,12 @@ export default function App() {
           horizon={horizon}
           dynamicFactors={globalFactors}
           healthStatus={healthStatus}
+        />
+        <SolutionsSection
+          factors={globalFactors}
+          healthStatus={healthStatus}
+          solutions={dynamicSolutions}
+          onSolutionsUpdate={(sols) => setDynamicSolutions(sols)}
         />
         <AboutSection />
       </main>
